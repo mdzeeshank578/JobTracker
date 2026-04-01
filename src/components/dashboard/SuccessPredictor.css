@@ -1,0 +1,259 @@
+.predictor-container {
+  padding: 30px 0;
+}
+
+.fade-in {
+  animation: predictFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes predictFadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.predictor-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.predictor-header .header-icon {
+  color: #4f46e5;
+  margin-bottom: 15px;
+  background: #e0e7ff;
+  padding: 12px;
+  border-radius: 16px;
+  width: 56px;
+  height: 56px;
+}
+
+.predictor-header h2 {
+  font-size: 2rem;
+  color: #0f172a;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.predictor-header p {
+  color: #64748b;
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.predictor-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: flex-start;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.predictor-input-card, .prediction-result-card {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f1f5f9;
+}
+
+.predictor-input-card h3 {
+  margin-bottom: 25px;
+  font-size: 1.25rem;
+  color: #1e293b;
+}
+
+.input-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+.resume-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  margin-bottom: 25px;
+  text-align: left;
+}
+
+.resume-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.resume-name {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.resume-status {
+  font-size: 0.8rem;
+  color: #10b981;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.predict-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.predict-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+}
+
+.predict-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.inline-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Prediction Result Component */
+.prediction-result-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.score-ring-container {
+  width: 160px;
+  margin: 0 auto 20px auto;
+}
+
+.circular-chart {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  max-height: 250px;
+}
+
+.circle-bg {
+  fill: none;
+  stroke: #f1f5f9;
+  stroke-width: 3.5;
+}
+
+.circle-value {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  animation: growRing 1.5s ease-out forwards;
+}
+
+.percentage {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.5em;
+  font-weight: bold;
+  text-anchor: middle;
+}
+
+@keyframes growRing {
+  0% { stroke-dasharray: 0 100; }
+}
+
+.prediction-details h3 {
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+  font-weight: 800;
+}
+
+.prediction-summary {
+  color: #475569;
+  font-size: 1.05rem;
+  margin-bottom: 25px;
+  line-height: 1.5;
+}
+
+.factors-list {
+  text-align: left;
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 12px;
+  width: 100%;
+}
+
+.factors-list h4 {
+  margin-bottom: 15px;
+  color: #334155;
+  font-size: 1rem;
+}
+
+.factors-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.factors-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.factors-list li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@media (max-width: 768px) {
+  .predictor-content {
+    grid-template-columns: 1fr;
+  }
+}

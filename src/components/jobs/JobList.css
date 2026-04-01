@@ -1,0 +1,95 @@
+.job-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.list-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 8px 16px;
+  flex: 1;
+  min-width: 250px;
+  transition: border-color var(--transition-speed);
+}
+
+.search-bar:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 119, 255, 0.1);
+}
+
+.search-icon {
+  color: var(--text-secondary);
+  margin-right: 12px;
+}
+
+.search-bar input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.search-bar input::placeholder {
+  color: var(--text-secondary);
+}
+
+.filter-dropdown {
+  display: flex;
+  align-items: center;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 8px 16px;
+  transition: border-color var(--transition-speed);
+}
+
+.filter-dropdown:focus-within {
+  border-color: var(--border-color); /* No primary glow for simple selects to match screenshot */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* very soft shadow */
+}
+
+.filter-icon {
+  color: var(--text-secondary);
+  margin-right: 6px;
+}
+
+.filter-dropdown select {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding-right: 8px;
+}
+
+.job-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.no-results {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 64px 20px;
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius-lg);
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+}
