@@ -341,13 +341,13 @@ export default function Profile({ onBack }) {
                 </div>
                 <div className="input-with-icon">
                   <label className="floating-label">Availability / Work Status</label>
-                  <Briefcase size={18} className="input-icon" />
-                  <select name="availability" value={formData.availability} onChange={handleChange} style={{paddingLeft: '44px'}}>
-                    <option value="Available Immediately">Available Immediately</option>
-                    <option value="Seeking Full-time">Seeking Full-time</option>
-                    <option value="Seeking Internship">Seeking Internship</option>
-                    <option value="Freelance / Contract">Open for Freelance / Contract</option>
-                  </select>
+                  <Clock size={18} className="input-icon" />
+                  <AutocompleteInput
+                    value={formData.availability}
+                    onChange={(val) => handleFieldUpdate('availability', val)}
+                    placeholder="e.g. Immediately Available (0 Days Notice)"
+                    suggestions={SUGGESTION_DICTIONARY.availability}
+                  />
                 </div>
               </div>
             </div>
@@ -699,18 +699,6 @@ export default function Profile({ onBack }) {
             <div className="profile-card">
               <div className="card-header"><h4>Higher Education (Colleges & Universities)</h4></div>
               <div className="card-body">
-                <div className="input-with-icon textarea-icon-wrapper">
-                  <label className="floating-label">Degree & Institution (Summary line)</label>
-                  <BookOpen size={18} className="input-icon align-top" />
-                  <AutocompleteTextarea
-                    value={formData.education}
-                    onChange={(val) => handleFieldUpdate('education', val)}
-                    rows={2}
-                    placeholder="Bachelor of Technology (B.Tech) in Electronics & Communication Engineering (ECE)"
-                    suggestions={SUGGESTION_DICTIONARY.education}
-                  />
-                </div>
-
                 {formData.educationList.map((edu, idx) => (
                   <div key={idx} className="array-item-card">
                     <div className="array-item-header">
@@ -799,26 +787,6 @@ export default function Profile({ onBack }) {
                           onChange={(val) => handleArrayChange('schoolingList', idx, 'schoolName', val)}
                           placeholder="e.g. St. Xavier's High School"
                           suggestions={SUGGESTION_DICTIONARY.schools}
-                        />
-                      </div>
-                      <div className="input-with-icon">
-                        <label className="floating-label">Board / Authority</label>
-                        <Award size={18} className="input-icon" />
-                        <AutocompleteInput
-                          value={sch.board}
-                          onChange={(val) => handleArrayChange('schoolingList', idx, 'board', val)}
-                          placeholder="CBSE / ICSE / State Board"
-                          suggestions={SUGGESTION_DICTIONARY.boards}
-                        />
-                      </div>
-                      <div className="input-with-icon">
-                        <label className="floating-label">Stream / Specialization</label>
-                        <BookOpen size={18} className="input-icon" />
-                        <AutocompleteInput
-                          value={sch.stream}
-                          onChange={(val) => handleArrayChange('schoolingList', idx, 'stream', val)}
-                          placeholder="Science (PCM) / Commerce"
-                          suggestions={SUGGESTION_DICTIONARY.streams}
                         />
                       </div>
                       <div className="input-with-icon">

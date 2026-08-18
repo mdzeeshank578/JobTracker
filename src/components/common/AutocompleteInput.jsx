@@ -553,6 +553,19 @@ export const SUGGESTION_DICTIONARY = {
     'Kubernetes Certified Administrator (CKA)', 'HashiCorp Certified: Terraform Associate'
   ],
 
+  availability: [
+    'Immediately Available (0 Days Notice)',
+    'Serving Notice Period (15 Days)',
+    'Serving Notice Period (30 Days)',
+    'Serving Notice Period (60 Days)',
+    'Serving Notice Period (90 Days)',
+    'Actively Open to Opportunities',
+    'Passively Exploring Roles',
+    'Not Looking / Currently Employed',
+    'Available for Freelance / Contract Work',
+    'Available for Summer / Winter Internship'
+  ],
+
   jobTitles: [
     'Senior Frontend Engineer', 'Lead Frontend Developer', 'Full Stack Engineer', 'Senior Full Stack Developer',
     'Backend Software Engineer', 'Lead Backend Engineer', 'DevOps Engineer', 'Cloud Infrastructure Engineer',
@@ -730,7 +743,7 @@ export function AutocompleteInput({ value, onChange, placeholder, suggestions = 
   };
 
   return (
-    <div className="autocomplete-wrapper" ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+    <div className="autocomplete-wrapper" ref={wrapperRef} style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
       <input
         id={id}
         name={name}
@@ -747,7 +760,24 @@ export function AutocompleteInput({ value, onChange, placeholder, suggestions = 
         autoComplete="off"
       />
       {isOpen && filtered.length > 0 && (
-        <ul className="autocomplete-dropdown">
+        <ul className="autocomplete-dropdown" style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          right: 0,
+          width: '100%',
+          boxSizing: 'border-box',
+          margin: '4px 0 0 0',
+          padding: '4px 0',
+          background: '#ffffff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
+          maxHeight: '220px',
+          overflowY: 'auto',
+          zIndex: 1000,
+          listStyle: 'none'
+        }}>
           {filtered.map((item, idx) => (
             <li
               key={idx}
@@ -844,7 +874,7 @@ export function AutocompleteTextarea({ value, onChange, placeholder, suggestions
   };
 
   return (
-    <div className="autocomplete-wrapper" ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+    <div className="autocomplete-wrapper" ref={wrapperRef} style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
       <textarea
         id={id}
         name={name}
@@ -860,7 +890,24 @@ export function AutocompleteTextarea({ value, onChange, placeholder, suggestions
         placeholder={placeholder}
       />
       {isOpen && filtered.length > 0 && (
-        <ul className="autocomplete-dropdown" style={{ top: '100%' }}>
+        <ul className="autocomplete-dropdown" style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          right: 0,
+          width: '100%',
+          boxSizing: 'border-box',
+          margin: '4px 0 0 0',
+          padding: '4px 0',
+          background: '#ffffff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
+          maxHeight: '220px',
+          overflowY: 'auto',
+          zIndex: 1000,
+          listStyle: 'none'
+        }}>
           {filtered.map((item, idx) => (
             <li
               key={idx}
