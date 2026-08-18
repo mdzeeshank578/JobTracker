@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Zap, Link } from 'lucide-react';
 import { analyzeJobMatch, simulateAutoFillJob } from '../../services/openai';
+import { AutocompleteInput, SUGGESTION_DICTIONARY } from '../common/AutocompleteInput';
 import './JobForm.css';
 
 export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
@@ -154,27 +155,26 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
               </button>
             </div>
           </div>
+          
           <div className="form-group">
             <label htmlFor="company">Company Name</label>
-            <input
+            <AutocompleteInput
               id="company"
-              type="text"
-              required
-              placeholder="e.g. Google"
               value={formData.company}
-              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+              onChange={(val) => setFormData({ ...formData, company: val })}
+              placeholder="e.g. Google"
+              suggestions={SUGGESTION_DICTIONARY.companies}
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="role">Role / Position</label>
-            <input
+            <AutocompleteInput
               id="role"
-              type="text"
-              required
-              placeholder="e.g. Frontend Engineer"
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              onChange={(val) => setFormData({ ...formData, role: val })}
+              placeholder="e.g. Frontend Engineer"
+              suggestions={SUGGESTION_DICTIONARY.jobTitles}
             />
           </div>
 
@@ -213,6 +213,7 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
                 <option value="Part-time">Part-time</option>
                 <option value="Contract">Contract</option>
                 <option value="Internship">Internship</option>
+                <option value="Freelance">Freelance</option>
               </select>
             </div>
 
@@ -223,87 +224,68 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               >
+                <option value="Saved">Saved</option>
                 <option value="Applied">Applied</option>
-                <option value="Interview">Interview</option>
+                <option value="Interview">Interviewing</option>
+                <option value="Offer">Offer Received</option>
                 <option value="Rejected">Rejected</option>
               </select>
             </div>
           </div>
 
-          <div className="form-row form-group-half">
-            <div className="form-group">
-              <label htmlFor="resumeFile">Resume (PDF/Doc)</label>
-              <input
-                id="resumeFile"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => setResumeFile(e.target.files[0])}
-              />
-              {formData.resumeUrl && <small><a href={formData.resumeUrl} target="_blank" rel="noopener noreferrer" download="Resume.pdf">Current Resume</a></small>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="coverLetterFile">Cover Letter</label>
-              <input
-                id="coverLetterFile"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => setCoverLetterFile(e.target.files[0])}
-              />
-              {formData.coverLetterUrl && <small><a href={formData.coverLetterUrl} target="_blank" rel="noopener noreferrer" download="CoverLetter.pdf">Current Cover Letter</a></small>}
-            </div>
-          </div>
-
           <div className="form-group">
-            <label htmlFor="description">Job Description</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label htmlFor="description" style={{ marginBottom: 0 }}>Job Description</label>
+              <button 
+                type="button" 
+                onClick={handleAIMatch}
+                disabled={isAnalyzingMatch}
+                style={{ 
+                  background: 'none', border: 'none', color: 'var(--primary-color)', 
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                  fontWeight: 600, fontSize: '0.85rem'
+                }}
+              >
+                <Zap size={14} /> {isAnalyzingMatch ? 'Analyzing...' : 'AI Match Score'}
+              </button>
+            </div>
+
             <textarea
               id="description"
-              rows={4}
-              placeholder="Paste the job description here to use AI Matching..."
-              value={formData.description || ''}
+              rows="4"
+              placeholder="Paste full job description here..."
+              value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
 
-          <div className="form-group ai-match-section" style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: formData.matchPercentage !== undefined ? '15px' : '0' }}>
-              <h4 style={{ margin: 0, color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>✨</span> AI Job Match
-              </h4>
-              <button type="button" onClick={handleAIMatch} disabled={isAnalyzingMatch} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.9rem' }}>
-                {isAnalyzingMatch ? 'Analyzing...' : 'Generate Match Score'}
-              </button>
-            </div>
-            
-            {formData.matchPercentage !== undefined && (
-              <div className="match-results">
-                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: formData.matchPercentage >= 80 ? '#10b981' : formData.matchPercentage >= 50 ? '#f59e0b' : '#ef4444' }}>
-                  {formData.matchPercentage}% Match
-                </div>
-                {formData.smartSuggestions && formData.smartSuggestions.length > 0 && (
-                  <ul style={{ paddingLeft: '20px', fontSize: '0.9rem', color: '#475569', marginTop: '10px' }}>
-                    {formData.smartSuggestions.map((sug, i) => (
-                      <li key={i}>{sug}</li>
-                    ))}
-                  </ul>
-                )}
+          {formData.matchPercentage !== undefined && (
+            <div className="ai-match-result" style={{ background: '#f0fdf4', padding: '12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontWeight: 600, color: '#166534' }}>AI Match Score:</span>
+                <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#15803d' }}>{formData.matchPercentage}%</span>
               </div>
-            )}
-          </div>
+              {formData.smartSuggestions && (
+                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: '#166534' }}>
+                  {formData.smartSuggestions.map((s, idx) => <li key={idx}>{s}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="form-group">
-            <label htmlFor="notes">Notes</label>
+            <label htmlFor="notes">Notes / Contact Details</label>
             <textarea
               id="notes"
-              rows={4}
-              placeholder="Any details about the interview process, links, etc."
-              value={formData.notes || ''}
+              rows="2"
+              placeholder="Interview details, recruiter contacts, salary details..."
+              value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
           </div>
 
-          <div className="modal-actions">
-            <button type="button" className="btn-cancel" onClick={onClose}>
+          <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+            <button type="button" className="btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="btn-primary" disabled={isSubmitting}>

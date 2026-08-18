@@ -6,8 +6,14 @@ import Navbar from './components/layout/Navbar';
 import Dashboard from './components/dashboard/Dashboard';
 import JobList from './components/jobs/JobList';
 import JobForm from './components/jobs/JobForm';
+import AICareerIntelligence from './components/dashboard/AICareerIntelligence';
 import AIResumeAnalyzer from './components/dashboard/AIResumeAnalyzer';
 import SuccessPredictor from './components/dashboard/SuccessPredictor';
+import Profile from './components/profile/Profile';
+import ResumeStudio from './components/profile/ResumeStudio';
+import ChatAssistant from './components/dashboard/ChatAssistant';
+import SyncCenter from './components/dashboard/SyncCenter';
+import LiveJobs from './components/liveJobs/LiveJobs';
 import { subscribeToJobs, addJob, updateJob, deleteJob, uploadDocument } from './services/db';
 
 function ProtectedRoute({ children }) {
@@ -33,6 +39,52 @@ function MainApp() {
     });
     return () => unsubscribe();
   }, [currentUser]);
+
+  // Handle Sync Center OAuth callbacks
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const syncConnected = params.get('sync_connected');
+    const provider = params.get('provider');
+    const email = params.get('email');
+    
+    if (syncConnected === 'true' && provider && email) {
+      // Connect account locally
+      const storageKey = `jobtracker_connected_accounts_${currentUser.uid}`;
+      const existing = localStorage.getItem(storageKey);
+      let accounts = [];
+      if (existing) {
+        try {
+          accounts = JSON.parse(existing);
+        } catch (e) {}
+      }
+      
+      // Upsert
+      const existingIdx = accounts.findIndex(acc => acc.provider === provider && acc.email === email);
+      const newAcc = { provider, email, connectedAt: new Date().toISOString() };
+      if (existingIdx >= 0) {
+        accounts[existingIdx] = newAcc;
+      } else {
+        accounts.push(newAcc);
+      }
+      localStorage.setItem(storageKey, JSON.stringify(accounts));
+
+      // Trigger a Sync Bridge execution immediately to fetch applications
+      import('./services/supabaseService').then(({ supabaseService }) => {
+        supabaseService.bridgeSyncedApplications(currentUser.uid, jobs, addJob, updateJob).then(bridgeResult => {
+          let alertMsg = `Successfully connected ${provider} account (${email})!`;
+          if (bridgeResult.added > 0 || bridgeResult.updated > 0) {
+            alertMsg += `\n🚀 Imported ${bridgeResult.added} new jobs and updated ${bridgeResult.updated} statuses.`;
+          }
+          alert(alertMsg);
+        });
+      });
+
+      // Clear query params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [currentUser, jobs]);
 
   const handleAddApplication = () => {
     setEditingJob(null);
@@ -111,7 +163,7 @@ function MainApp() {
 
     } catch (error) {
       console.error("Error saving job:", error);
-      alert("Failed to save application data.");
+      alert(`Failed to save application data: ${error.message || error}`);
       throw error;
     }
   };
@@ -151,31 +203,53 @@ function MainApp() {
 
   return (
     <div className="app-container">
-      <Navbar onAddApplication={handleAddApplication} />
+      {currentTab === 'profile' ? (
+        <Profile onBack={() => setCurrentTab('overview')} />
+      ) : (
+        <>
+          <Navbar 
+            onAddApplication={handleAddApplication}
+            onOpenProfile={() => setCurrentTab('profile')}
+          />
 
-      <Dashboard
-        jobs={jobs}
-        currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
-      />
+          <Dashboard
+            jobs={jobs}
+            currentTab={currentTab}
+            setCurrentTab={setCurrentTab}
+            onEdit={handleEditApplication}
+            onDelete={handleDeleteJob}
+            onSaveGlobal={handleSaveGlobalJob}
+            globalSearchTerm={globalSearchTerm}
+            setGlobalSearchTerm={setGlobalSearchTerm}
+          />
 
-      {currentTab === 'applications' && (
-        <JobList
-          jobs={jobs}
-          onEdit={handleEditApplication}
-          onDelete={handleDeleteJob}
-          onSaveGlobal={handleSaveGlobalJob}
-          globalSearchTerm={globalSearchTerm}
-          setGlobalSearchTerm={setGlobalSearchTerm}
-        />
-      )}
+          {currentTab === 'applications' && (
+            <JobList
+              jobs={jobs}
+              onEdit={handleEditApplication}
+              onDelete={handleDeleteJob}
+              onSaveGlobal={handleSaveGlobalJob}
+              globalSearchTerm={globalSearchTerm}
+              setGlobalSearchTerm={setGlobalSearchTerm}
+            />
+          )}
 
-      {currentTab === 'ai-analyzer' && (
-        <AIResumeAnalyzer />
-      )}
+          {currentTab === 'ai-analyzer' && (
+            <AICareerIntelligence jobs={jobs} />
+          )}
 
-      {currentTab === 'ai-predictor' && (
-        <SuccessPredictor jobs={jobs} />
+          {currentTab === 'ai-predictor' && (
+            <SuccessPredictor jobs={jobs} />
+          )}
+
+          {currentTab === 'resume-studio' && (
+            <ResumeStudio />
+          )}
+
+          {currentTab === 'live-jobs' && (
+            <LiveJobs />
+          )}
+        </>
       )}
 
       <JobForm
@@ -184,6 +258,7 @@ function MainApp() {
         onSubmit={handleFormSubmit}
         initialData={editingJob}
       />
+      <ChatAssistant jobs={jobs} />
     </div>
   );
 }

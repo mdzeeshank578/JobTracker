@@ -8,6 +8,45 @@ export default function JobCard({ job, onEdit, onDelete, isGlobal = false, onSav
   const [prepData, setPrepData] = useState(null);
   const [isLoadingPrep, setIsLoadingPrep] = useState(false);
 
+  const handleDownloadAttachment = async (attachment) => {
+    try {
+      const token = localStorage.getItem(`jobtracker_google_token_${job.userId}`);
+      if (!token) {
+        alert("Please connect or sync Gmail to authenticate and download attachments.");
+        return;
+      }
+      
+      const response = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${attachment.messageId}/attachments/${attachment.attachmentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      if (!response.ok) throw new Error("Failed to fetch attachment from Gmail");
+      const data = await response.json();
+      
+      const base64Data = data.data.replace(/-/g, '+').replace(/_/g, '/');
+      const binaryStr = atob(base64Data);
+      const len = binaryStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: attachment.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Error downloading attachment: " + err.message);
+    }
+  };
+
   // Map status to css class
   const getStatusClass = (status) => {
     switch (status) {
@@ -51,7 +90,7 @@ export default function JobCard({ job, onEdit, onDelete, isGlobal = false, onSav
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {job.matchPercentage !== undefined && (
+          {job.matchPercentage !== undefined && job.matchPercentage !== null && job.matchPercentage !== '' && (
             <div className="job-status" style={{ background: job.matchPercentage >= 80 ? 'rgba(16, 185, 129, 0.15)' : job.matchPercentage >= 50 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: job.matchPercentage >= 80 ? '#059669' : job.matchPercentage >= 50 ? '#d97706' : '#dc2626', border: '1px solid currentColor' }}>
               ✨ {job.matchPercentage}% Match
             </div>
@@ -77,7 +116,61 @@ export default function JobCard({ job, onEdit, onDelete, isGlobal = false, onSav
         </div>
       )}
 
-      {(job.resumeUrl || job.coverLetterUrl) && (
+      {job.interviewDate && (
+        <div className="job-meta-details" style={{ margin: '0 16px 12px 16px', padding: '10px 14px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
+          <Clock size={15} style={{ color: '#3b82f6', flexShrink: 0 }} />
+          <div>
+            <strong style={{ color: '#1e293b' }}>Interview Date:</strong> <span style={{ color: '#4f46e5', fontWeight: 600 }}>{new Date(job.interviewDate).toLocaleDateString()}</span>
+          </div>
+        </div>
+      )}
+
+      {(job.recruiterName || job.recruiterEmail || job.referenceNumber) && (
+        <div className="job-meta-details" style={{ margin: '0 16px 12px 16px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>
+          <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '2px' }}>Recruiter details:</div>
+          {job.recruiterName && <div>Name: {job.recruiterName}</div>}
+          {job.recruiterEmail && <div>Email: <a href={`mailto:${job.recruiterEmail}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>{job.recruiterEmail}</a></div>}
+          {job.referenceNumber && <div>Ref ID: {job.referenceNumber}</div>}
+        </div>
+      )}
+
+      {job.status === 'Rejected' && (job.rejectionTimestamp || job.rejectionEmailText) && (
+        <div className="job-meta-details" style={{ margin: '0 16px 12px 16px', padding: '12px 14px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.1)', fontSize: '0.85rem', color: '#b91c1c' }}>
+          <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <AlertCircle size={16} /> Rejection Records
+          </div>
+          {job.rejectionTimestamp && (
+            <div style={{ marginBottom: '4px', fontSize: '0.8rem', color: '#7f1d1d' }}>
+              <strong>Date Received:</strong> {new Date(job.rejectionTimestamp).toLocaleString()}
+            </div>
+          )}
+          {job.rejectionEmailText && (
+            <div style={{ background: '#fff', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '6px', padding: '8px 10px', fontSize: '0.8rem', color: '#4b5563', maxHeight: '110px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontStyle: 'italic', fontFamily: 'monospace' }}>
+              {job.rejectionEmailText}
+            </div>
+          )}
+        </div>
+      )}
+
+      {job.activities && job.activities.length > 0 && (
+        <div className="job-meta-details" style={{ margin: '0 16px 12px 16px', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.82rem', color: '#475569' }}>
+          <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            📜 Activity History
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '100px', overflowY: 'auto', paddingRight: '4px' }}>
+            {job.activities.slice().reverse().map((act) => (
+              <div key={act.id} style={{ display: 'flex', gap: '6px', borderLeft: '2px solid #cbd5e1', paddingLeft: '8px', marginLeft: '4px' }}>
+                <div style={{ flexGrow: 1 }}>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>{new Date(act.timestamp).toLocaleString()}</div>
+                  <div style={{ color: '#334155', fontWeight: 500 }}>{act.message}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {((job.resumeUrl || job.coverLetterUrl) || (job.attachments && job.attachments.length > 0)) && (
         <div className="job-documents">
           {job.resumeUrl && (
             <a href={job.resumeUrl} target="_blank" rel="noopener noreferrer" className="document-link" download="Resume.pdf">
@@ -89,6 +182,16 @@ export default function JobCard({ job, onEdit, onDelete, isGlobal = false, onSav
               <FileText size={14} /> Cover Letter
             </a>
           )}
+          {job.attachments && job.attachments.map((att, i) => (
+            <button 
+              key={i} 
+              onClick={() => handleDownloadAttachment(att)} 
+              className="document-link" 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit', display: 'flex', alignItems: 'center', gap: '4px', textAlign: 'left', color: '#4f46e5' }}
+            >
+              <FileText size={14} /> {att.filename}
+            </button>
+          ))}
         </div>
       )}
 

@@ -1,0 +1,345 @@
+{
+  "applications": [
+    {
+      "id": "1296e0cb-fbd0-4c38-9a80-5748658425e1",
+      "user_id": "test_user_999",
+      "company": "Vercel",
+      "role": "Senior React Architect",
+      "status": "Applied",
+      "date_applied": "2026-06-24",
+      "deadline": null,
+      "notes": "",
+      "job_url": "https://vercel.com/jobs/react-arch",
+      "location": "Remote",
+      "source": "Chrome Extension",
+      "snippet": "Simulated scraper content",
+      "created_at": "2026-06-24T21:56:58.375Z",
+      "updated_at": "2026-06-24T21:58:03.140Z"
+    },
+    {
+      "id": "6addcd0e-fa29-4cb2-a88a-6dbd97a05941",
+      "user_id": "test_user_999",
+      "company": "Openai",
+      "role": "Frontend",
+      "status": "Applied",
+      "date_applied": "2026-06-24",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/25/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Received application confirmation",
+      "created_at": "2026-06-24T21:58:03.192Z",
+      "updated_at": "2026-06-24T21:58:03.192Z"
+    },
+    {
+      "id": "56da28c2-6325-4d49-9c90-9fcbb83c9270",
+      "user_id": "test_user_999",
+      "company": "Google",
+      "role": "Software Engineer",
+      "status": "Rejected",
+      "date_applied": "2026-06-24",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/25/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Received rejection email",
+      "created_at": "2026-06-24T21:58:03.193Z",
+      "updated_at": "2026-06-24T21:58:03.193Z"
+    },
+    {
+      "id": "f3ff2310-5992-4ecf-94e7-0cde5e928946",
+      "user_id": "test_user_999",
+      "company": "Stripe",
+      "role": "Software Engineer",
+      "status": "Interviewing",
+      "date_applied": "2026-06-24",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/25/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Invited to schedule interview",
+      "created_at": "2026-06-24T21:58:03.193Z",
+      "updated_at": "2026-06-24T21:58:03.193Z"
+    },
+    {
+      "id": "50df1d01-c2cd-4fd9-bb35-2a7c596b2a07",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "company": "Google",
+      "role": "Software Engineer",
+      "status": "Rejected",
+      "date_applied": "2026-06-26",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/26/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Received rejection email",
+      "created_at": "2026-06-26T09:49:12.922Z",
+      "updated_at": "2026-06-26T09:49:12.922Z"
+    },
+    {
+      "id": "3d4b5a07-9ad4-4d38-b4f4-7b663f2d4078",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "company": "Openai",
+      "role": "Frontend",
+      "status": "Applied",
+      "date_applied": "2026-06-26",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/26/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Received application confirmation",
+      "created_at": "2026-06-26T09:49:12.924Z",
+      "updated_at": "2026-06-26T09:49:12.924Z"
+    },
+    {
+      "id": "195219d1-002d-43fa-89f5-e4a9fb9d1086",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "company": "Stripe",
+      "role": "Software Engineer",
+      "status": "Interviewing",
+      "date_applied": "2026-06-26",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/26/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Invited to schedule interview",
+      "created_at": "2026-06-26T09:49:16.861Z",
+      "updated_at": "2026-06-26T09:49:16.861Z"
+    },
+    {
+      "id": "e914b6c5-11c6-45c8-a1fc-5ed25e0215c8",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "company": "Vercel",
+      "role": "Full Stack",
+      "status": "Applied",
+      "date_applied": "2026-06-26",
+      "deadline": null,
+      "notes": "Automatically imported via AI Email Sync on 6/26/2026",
+      "job_url": "",
+      "location": "",
+      "source": "Gmail Sync",
+      "snippet": "Received application confirmation",
+      "created_at": "2026-06-26T09:49:16.862Z",
+      "updated_at": "2026-06-26T09:49:16.862Z"
+    }
+  ],
+  "sync_accounts": [
+    {
+      "id": "eb4c16b4-0164-40cd-855f-5ec2cfd4ac2f",
+      "user_id": "test_user_999",
+      "provider": "google",
+      "email": "mock_test_@gmail.com",
+      "access_token": "mock_access_token_123",
+      "refresh_token": "mock_refresh_token_123",
+      "expiry_date": "2026-06-24T22:58:03.175Z",
+      "created_at": "2026-06-24T21:58:03.175Z",
+      "updated_at": "2026-06-24T21:58:03.175Z"
+    },
+    {
+      "id": "c632c6f5-913f-4c17-8afc-32712a1e342b",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "provider": "google",
+      "email": "mock_39OsW@gmail.com",
+      "access_token": "mock_access_token_123",
+      "refresh_token": "mock_refresh_token_123",
+      "expiry_date": "2026-06-26T10:49:12.920Z",
+      "created_at": "2026-06-26T09:49:12.921Z",
+      "updated_at": "2026-06-26T09:49:12.921Z"
+    }
+  ],
+  "sync_logs": [
+    {
+      "id": "e710257d-6d37-452c-ad79-9f32c2bf088a",
+      "user_id": "test_user_999",
+      "event_type": "extension_sync",
+      "status": "success",
+      "message": "Imported new job application: Vercel - Senior React Architect via Extension.",
+      "details": {},
+      "created_at": "2026-06-24T21:56:58.375Z"
+    },
+    {
+      "id": "8d333cc9-6ba6-489f-86c2-f2e685440556",
+      "user_id": "test_user_999",
+      "event_type": "extension_sync",
+      "status": "success",
+      "message": "Updated application for Vercel (Senior React Architect) to Applied via Extension.",
+      "details": {},
+      "created_at": "2026-06-24T21:57:16.556Z"
+    },
+    {
+      "id": "9771190b-4de6-4fbe-aa88-755b0ad18fa6",
+      "user_id": "test_user_999",
+      "event_type": "extension_sync",
+      "status": "success",
+      "message": "Updated application for Vercel (Senior React Architect) to Applied via Extension.",
+      "details": {},
+      "created_at": "2026-06-24T21:58:03.140Z"
+    },
+    {
+      "id": "77694a13-20cc-4e26-bdec-4b84d2e829ca",
+      "user_id": "test_user_999",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Openai - Frontend as Applied.",
+      "details": {
+        "success": true,
+        "company": "Openai",
+        "role": "Frontend",
+        "status": "Applied",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Received application confirmation",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-24T21:58:03.192Z"
+    },
+    {
+      "id": "7d70db99-28f6-4aaf-a981-a30dbfb7e0da",
+      "user_id": "test_user_999",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Google - Software Engineer as Rejected.",
+      "details": {
+        "success": true,
+        "company": "Google",
+        "role": "Software Engineer",
+        "status": "Rejected",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Received rejection email",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-24T21:58:03.193Z"
+    },
+    {
+      "id": "7423301b-e2f9-4f1d-9cc1-741e8fc24ec3",
+      "user_id": "test_user_999",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Stripe - Software Engineer as Interviewing.",
+      "details": {
+        "success": true,
+        "company": "Stripe",
+        "role": "Software Engineer",
+        "status": "Interviewing",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Invited to schedule interview",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-24T21:58:03.193Z"
+    },
+    {
+      "id": "05cfe53b-f2f2-473e-98ba-4b704798eb1a",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Google - Software Engineer as Rejected.",
+      "details": {
+        "success": true,
+        "company": "Google",
+        "role": "Software Engineer",
+        "status": "Rejected",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Received rejection email",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-26T09:49:12.923Z"
+    },
+    {
+      "id": "bcf0879a-b1c3-45be-84b7-cf2a0f3a6907",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Openai - Frontend as Applied.",
+      "details": {
+        "success": true,
+        "company": "Openai",
+        "role": "Frontend",
+        "status": "Applied",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Received application confirmation",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-26T09:49:12.924Z"
+    },
+    {
+      "id": "89361b01-45de-4632-8e72-fc7bf4916ebe",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Stripe - Software Engineer as Interviewing.",
+      "details": {
+        "success": true,
+        "company": "Stripe",
+        "role": "Software Engineer",
+        "status": "Interviewing",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Invited to schedule interview",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-26T09:49:16.861Z"
+    },
+    {
+      "id": "0b06f011-74a0-4ac0-a872-1b4d9dfc15e4",
+      "user_id": "39OsWUC8m8UIHIcXvBCxtMuBtTZ2",
+      "event_type": "email_sync",
+      "status": "success",
+      "message": "AI synced import: Added new application for Vercel - Full Stack as Applied.",
+      "details": {
+        "success": true,
+        "company": "Vercel",
+        "role": "Full Stack",
+        "status": "Applied",
+        "location": null,
+        "jobUrl": null,
+        "snippet": "Received application confirmation",
+        "method": "Heuristic Parser (Fallback)"
+      },
+      "created_at": "2026-06-26T09:49:16.862Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "5ba86085-400e-4a61-8667-3e21f2e570ba",
+      "email": "testuser@example.com",
+      "displayName": "Test User",
+      "salt": "beb6b8c8aed7dc112442975c9ab104ef",
+      "hash": "79dbe77222ab0b8a3d4d723abdeb4e59e937f09eca09a620178e2403364d3c27446689f06bb8ecf20ca5af0cd63ba11ed2df45b4da6ad5edb179e9439c976422",
+      "created_at": "2026-08-14T21:10:05.055Z"
+    },
+    {
+      "id": "9a14cbcb-02e2-44c4-bb35-013102964115",
+      "email": "mdzeeshank578@gmail.com",
+      "displayName": "Zeeshan",
+      "salt": "7e12d5445efa5834143aacf2b0fc25a8",
+      "hash": "b75b0892f136a2410e23f1255f801e331331f08d5ae913cf9715a8fe4ce082618175522e7068e3463bd3cc1877d8dd941220412bfda680e8e14b2653e90c592a",
+      "created_at": "2026-08-14T21:15:10.280Z"
+    },
+    {
+      "id": "979812c4-3614-444d-98e6-5f4d4c069d05",
+      "email": "user.google@gmail.com",
+      "displayName": "Google User",
+      "salt": "18fa35ea9417710251e7c6b1773536b0",
+      "hash": "d6fc7f98ee84544f0bd9e771a1c1cd4d849f041d8f967280027571976f738ff2f297d408955c8c6951fc111dc5954df5b4c757f5a03ba6e4fc30ca5b23a764ed",
+      "created_at": "2026-08-14T21:15:25.312Z"
+    },
+    {
+      "id": "fd87cbe5-5134-4b0e-b956-a65433fb1a34",
+      "email": "mdzeeshankhan@gmail.com",
+      "displayName": "Zeeshan Khan",
+      "salt": "3a37226f2e0fbd49bc215d6d1c6a48aa",
+      "hash": "f629a49388630531ec92093bdea6439eacae4c7fa41339da5eeedb934053812059195af45cf4cd608bbe6a84afa35419cb4ddf7d556c385a314bd020b63207d4",
+      "created_at": "2026-08-14T21:35:18.057Z"
+    }
+  ]
+}

@@ -1,19 +1,195 @@
-import React, { useMemo, useState } from 'react';
-import { Briefcase, Users, Trophy, XCircle, BarChart2, List as ListIcon, Brain, AlertCircle, TrendingUp, Target, RefreshCw, CheckCircle, Mail } from 'lucide-react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Briefcase, Users, Trophy, XCircle, BarChart2, List as ListIcon, Brain, AlertCircle, TrendingUp, Target, RefreshCw, CheckCircle, Mail, FileText, Search } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
 import { processManualEmailText } from '../../services/emailProcessor';
-import { updateJob } from '../../services/db';
+import { updateJob, addJob } from '../../services/db';
+import { syncEmailsWithJobs } from '../../services/gmail';
+import { supabaseService } from '../../services/supabaseService';
+import JobList from '../jobs/JobList';
 import './Dashboard.css';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']; // Applied, Interviewing, Offer, Rejected
 
-export default function Dashboard({ jobs, currentTab, setCurrentTab }) {
-  const { currentUser } = useAuth();
+export default function Dashboard({ 
+  jobs, 
+  currentTab, 
+  setCurrentTab,
+  onEdit,
+  onDelete,
+  onSaveGlobal,
+  globalSearchTerm,
+  setGlobalSearchTerm 
+}) {
+  const { currentUser, connectAndGetGmailToken } = useAuth();
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [emailText, setEmailText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotifications, setSyncNotifications] = useState([]);
+  const [pendingReviews, setPendingReviews] = useState([]);
+
+  // Auto-sync refs to keep the background sync interval stable
+  const jobsRef = useRef(jobs);
+  const isSyncingRef = useRef(isSyncing);
+
+  useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+
+  useEffect(() => {
+    isSyncingRef.current = isSyncing;
+  }, [isSyncing]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const performSilentSync = async () => {
+      const syncEnabled = localStorage.getItem('jobtracker_gmail_sync_enabled') !== 'false';
+      if (!syncEnabled || isSyncingRef.current) return;
+
+      const accessToken = localStorage.getItem(`jobtracker_google_token_${currentUser.uid}`);
+      if (!accessToken) return;
+
+      try {
+        console.log('[Auto-Sync] Running silent background sync...');
+        const syncResult = await syncEmailsWithJobs(accessToken, currentUser.uid, jobsRef.current);
+        if (syncResult && syncResult.updatedCount > 0) {
+          console.log(`[Auto-Sync] Updated ${syncResult.updatedCount} applications in the background.`);
+        }
+      } catch (err) {
+        console.warn('[Auto-Sync] Background sync failed:', err);
+      }
+    };
+
+    // Run silent sync after 5 seconds on load
+    const initialTimeout = setTimeout(() => {
+      performSilentSync();
+    }, 5000);
+
+    // Run silent sync every 60 seconds
+    const interval = setInterval(() => {
+      performSilentSync();
+    }, 60000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [currentUser]);
+
+  const handleGmailSync = async () => {
+    const syncEnabled = localStorage.getItem('jobtracker_gmail_sync_enabled') !== 'false';
+    if (!syncEnabled) {
+      setSyncNotifications([{
+        type: 'error',
+        message: 'Gmail synchronization is disabled. Please enable it in the Sync Center.'
+      }]);
+      setTimeout(() => setSyncNotifications([]), 6000);
+      return;
+    }
+    
+    setIsSyncing(true);
+    setSyncNotifications([]);
+    
+    try {
+      let accessToken = localStorage.getItem(`jobtracker_google_token_${currentUser.uid}`);
+      let syncResult;
+
+      try {
+        if (!accessToken) {
+          setSyncNotifications([{ type: 'info', message: 'Connecting to Google Gmail...' }]);
+          accessToken = await connectAndGetGmailToken();
+        }
+        
+        if (!accessToken) throw new Error('Could not obtain Gmail access token.');
+
+        setSyncNotifications([{ type: 'info', message: 'Scanning your Gmail inbox...' }]);
+        syncResult = await syncEmailsWithJobs(accessToken, currentUser.uid, jobs);
+      } catch (innerError) {
+        const isUnauthorized = innerError.message?.includes('401') || 
+                               innerError.message?.toLowerCase().includes('unauthorized') || 
+                               innerError.message?.toLowerCase().includes('invalid credentials') ||
+                               innerError.message?.toLowerCase().includes('token expired');
+        
+        if (isUnauthorized) {
+          console.warn("Cached Google token expired, clearing and retrying via popup...");
+          localStorage.removeItem(`jobtracker_google_token_${currentUser.uid}`);
+          setSyncNotifications([{ type: 'info', message: 'Re-authenticating Gmail session...' }]);
+          
+          accessToken = await connectAndGetGmailToken();
+          if (!accessToken) throw new Error('Could not obtain Gmail access token.');
+          
+          setSyncNotifications([{ type: 'info', message: 'Connected! Scanning your Gmail inbox...' }]);
+          syncResult = await syncEmailsWithJobs(accessToken, currentUser.uid, jobs);
+        } else {
+          throw innerError;
+        }
+      }
+      
+      // Save the email connection locally in connected accounts
+      const storageKey = `jobtracker_connected_accounts_${currentUser.uid}`;
+      const savedAccounts = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      if (!savedAccounts.some(acc => acc.provider === 'google' && acc.email === currentUser.email)) {
+        savedAccounts.push({
+          provider: 'google',
+          email: currentUser.email,
+          connectedAt: new Date().toISOString()
+        });
+        localStorage.setItem(storageKey, JSON.stringify(savedAccounts));
+      }
+
+      setPendingReviews(syncResult.pendingReviews || []);
+      
+      const newNotifications = [];
+      if (syncResult.updatedCount > 0) {
+        newNotifications.push({
+          type: 'success',
+          message: `Scanned recent emails. Updated ${syncResult.updatedCount} applications!`
+        });
+      } else if (syncResult.fetchedMessages === 0) {
+        newNotifications.push({
+          type: 'info',
+          message: 'No emails matched the Gmail search query.'
+        });
+      } else if (syncResult.classifiedMessages === 0) {
+        newNotifications.push({
+          type: 'info',
+          message: `${syncResult.fetchedMessages} emails found, but none were classified as job-related.`
+        });
+      } else if (syncResult.matchedApplications === 0) {
+        newNotifications.push({
+          type: 'info',
+          message: `${syncResult.classifiedMessages} job emails found, but none matched your active applications.`
+        });
+      } else {
+        newNotifications.push({
+          type: 'info',
+          message: 'Emails scanned, but no application statuses changed.'
+        });
+      }
+      
+      if (syncResult.pendingReviews && syncResult.pendingReviews.length > 0) {
+        newNotifications.push({
+          type: 'info',
+          message: `Flagged ${syncResult.pendingReviews.length} emails for manual review (low match confidence).`
+        });
+      }
+      
+      setSyncNotifications(newNotifications);
+
+    } catch (error) {
+      console.error(error);
+      setSyncNotifications([{
+        type: 'error',
+        message: error.message || 'Failed to sync with Gmail.'
+      }]);
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncNotifications([]), 8500);
+    }
+  };
+
 
   const handleProcessEmail = async () => {
     if (!emailText.trim()) return;
@@ -53,6 +229,13 @@ export default function Dashboard({ jobs, currentTab, setCurrentTab }) {
   const interviewing = jobs.filter(j => j.status === 'Interviewing' || j.status === 'Interview').length;
   const offers = jobs.filter(j => j.status === 'Offer').length;
   const rejected = jobs.filter(j => j.status === 'Rejected').length;
+  
+  const autoSyncedCount = jobs.filter(j => 
+    j.source === 'Gmail Sync' || 
+    j.source === 'Outlook Sync' || 
+    j.source === 'Chrome Extension' ||
+    (j.source && j.source.toLowerCase().includes('sync'))
+  ).length;
 
   const successRate = total > 0 ? Math.round((offers / total) * 100) : 0;
 
@@ -187,6 +370,35 @@ export default function Dashboard({ jobs, currentTab, setCurrentTab }) {
   };
   const nudges = generateNudges();
 
+  // Smart Reminders Logic
+  const generateReminders = () => {
+    if (jobs.length === 0) return [];
+    
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const upcoming = jobs
+      .filter(j => j.deadline && j.status !== 'Rejected' && j.status !== 'Offer' && j.status !== 'Accepted')
+      .map(j => {
+        const d = new Date(j.deadline);
+        // Fallback gracefully if parsing fails
+        if (isNaN(d)) return null;
+        return {
+          id: j.id,
+          company: j.company,
+          role: j.role || 'Application',
+          date: d,
+          dateString: d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' })
+        };
+      })
+      .filter(j => j !== null && j.date >= today)
+      .sort((a, b) => a.date - b.date)
+      .slice(0, 3);
+
+    return upcoming;
+  };
+  const reminders = generateReminders();
+
   return (
     <div className="dashboard">
       <div className="tabs">
@@ -196,26 +408,48 @@ export default function Dashboard({ jobs, currentTab, setCurrentTab }) {
         <button className={`tab ${currentTab === 'applications' ? 'active' : ''}`} onClick={() => setCurrentTab('applications')}>
           <ListIcon size={18} /> Applications
         </button>
+        <button className={`tab ${currentTab === 'live-jobs' ? 'active' : ''}`} onClick={() => setCurrentTab('live-jobs')}>
+          <Search size={18} /> Live Jobs
+        </button>
         <button className={`tab ${currentTab === 'ai-analyzer' ? 'active' : ''}`} onClick={() => setCurrentTab('ai-analyzer')}>
-          <Brain size={18} /> AI Analyzer
+          <Brain size={18} /> AI
         </button>
         <button className={`tab ${currentTab === 'ai-predictor' ? 'active' : ''}`} onClick={() => setCurrentTab('ai-predictor')}>
-          <Target size={18} /> Success Predictor
+          <Target size={18} /> Predictor
+        </button>
+        <button className={`tab ${currentTab === 'resume-studio' ? 'active' : ''}`} onClick={() => setCurrentTab('resume-studio')}>
+          <FileText size={18} /> Resume Studio
         </button>
       </div>
 
       {currentTab === 'overview' && (
         <div className="overview-content">
           {/* Sync Header */}
-          <div className="sync-header" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <button 
-              onClick={() => setIsEmailModalOpen(true)} 
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '500', boxShadow: '0 4px 6px rgba(79, 70, 229, 0.2)' }}
-            >
-              <Mail size={18} />
-              Paste Email Update
-            </button>
+          <div className="sync-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#64748b' }}>
+              <span style={{ display: 'flex', padding: '4px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                <CheckCircle size={14} />
+              </span>
+              <span>Privacy-First: AI scans only job-related emails. Unrelated mail is ignored.</span>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={handleGmailSync}
+                disabled={isSyncing}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', background: '#ffffff', border: '1px solid #cbd5e1', color: '#475569', cursor: isSyncing ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+              >
+                <RefreshCw size={18} className={isSyncing ? "spin-animation" : ""} />
+                Sync Gmail
+              </button>
+              <button 
+                onClick={() => setIsEmailModalOpen(true)} 
+                className="btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '500', boxShadow: '0 4px 6px rgba(79, 70, 229, 0.2)' }}
+              >
+                <Mail size={18} />
+                Paste Email Update
+              </button>
+            </div>
           </div>
 
           {/* Email Modal Overlay */}
@@ -276,6 +510,85 @@ export default function Dashboard({ jobs, currentTab, setCurrentTab }) {
                   {note.message}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Flagged Emails for Manual Review */}
+          {pendingReviews.length > 0 && (
+            <div className="pending-reviews-panel" style={{ marginBottom: '24px', padding: '20px', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: '12px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ Flagged Emails for Manual Review <span style={{ fontSize: '0.8rem', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', color: '#475569', fontWeight: 500 }}>Dev Debugging Mode</span>
+                </h3>
+                <button 
+                  onClick={() => setPendingReviews([])} 
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.85rem' }}
+                >
+                  Clear Flagged List
+                </button>
+              </div>
+              <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: '#64748b' }}>
+                The following emails were classified as job-related, but did not match any of your existing job applications with high confidence.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {pendingReviews.map((rev, idx) => (
+                  <div key={idx} style={{ padding: '14px', border: '1px solid #f1f5f9', background: '#f8fafc', borderRadius: '8px', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '14px', right: '14px', padding: '3px 8px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 600, background: rev.confidence >= 0.4 ? '#fef3c7' : '#fee2e2', color: rev.confidence >= 0.4 ? '#d97706' : '#b91c1c' }}>
+                      Confidence: {(rev.confidence * 100).toFixed(0)}%
+                    </div>
+                    
+                    <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: '4px', fontSize: '0.9rem', paddingRight: '120px' }}>
+                      {rev.subject}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '8px' }}>
+                      From: {rev.from} | Company: <strong style={{color: '#475569'}}>{rev.companyName || 'Unknown'}</strong> | Title: <strong style={{color: '#475569'}}>{rev.jobTitle || 'Unknown'}</strong>
+                    </div>
+                    
+                    <div style={{ fontSize: '0.82rem', background: '#f1f5f9', padding: '6px 10px', borderRadius: '6px', color: '#475569', fontStyle: 'italic', marginBottom: '8px' }}>
+                      "{rev.snippet}"
+                    </div>
+                    
+                    <div style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: 500 }}>
+                      Debug Reason: {rev.reason}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Smart Reminders Section */}
+          {(reminders.length > 0 || rejected > 0) && (
+            <div className="smart-reminders-section" style={{ marginBottom: '32px', textAlign: 'left' }}>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>Smart Reminders</h3>
+              
+              {reminders.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                  {reminders.map((rem, i) => (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', 
+                      borderRadius: '16px', padding: '18px 20px', 
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                    }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#6366f1', marginRight: '16px', flexShrink: 0 }}></div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>Deadline: {rem.role}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '4px' }}>{rem.company}</div>
+                      </div>
+                      <div style={{ color: '#6366f1', fontWeight: 500, fontSize: '0.9rem' }}>
+                        {rem.dateString}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {rejected > 0 && (
+                 <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0, textAlign: 'left', paddingLeft: '8px' }}>
+                    You've handled {rejected} rejection{rejected > 1 ? 's' : ''} with grace. Keep going!
+                 </p>
+              )}
             </div>
           )}
 
@@ -352,6 +665,16 @@ export default function Dashboard({ jobs, currentTab, setCurrentTab }) {
               <div className="stat-info">
                 <h2>{rejected}</h2>
                 <p>Rejected</p>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(16, 185, 129, 0.12)' }}>
+                <RefreshCw size={24} style={{ color: '#10b981' }} />
+              </div>
+              <div className="stat-info">
+                <h2>{autoSyncedCount}</h2>
+                <p>Synced Apps</p>
               </div>
             </div>
 

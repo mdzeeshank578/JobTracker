@@ -1,0 +1,19 @@
+{
+  "name": "jobtracker-backend",
+  "version": "1.0.0",
+  "description": "Backend API for JobTracker Sync System",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0"
+  }
+}

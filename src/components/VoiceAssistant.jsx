@@ -103,10 +103,6 @@ export default function VoiceAssistant({ jobs, setCurrentTab, onAddApplication, 
        speak(`Your overall success rate is currently ${rate} percent with ${offers} total offers!`);
        setCurrentTab('overview');
     }
-    else if (cmd.includes('add') && (cmd.includes('job') || cmd.includes('application'))) {
-       speak("Opening the new application form for you now.");
-       onAddApplication();
-    }
     else if (cmd.includes('dashboard') || cmd.includes('overview') || cmd.includes('home')) {
        speak("Taking you to your main dashboard overview.");
        setCurrentTab('overview');

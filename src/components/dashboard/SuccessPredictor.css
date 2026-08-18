@@ -84,6 +84,7 @@
   border-radius: 10px;
   font-size: 1rem;
   transition: all 0.2s;
+  box-sizing: border-box;
 }
 
 .input-group input:focus {
@@ -109,10 +110,11 @@
   flex-direction: column;
 }
 
-.resume-name {
-  font-weight: 600;
-  color: #334155;
-  font-size: 0.95rem;
+.synced-resume-name {
+  font-weight: normal;
+  color: #475569;
+  font-size: 0.8rem;
+  word-break: break-all;
 }
 
 .resume-status {
@@ -221,6 +223,7 @@
   padding: 20px;
   border-radius: 12px;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .factors-list h4 {

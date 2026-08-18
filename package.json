@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server:sync": "node backend/server.js",
+    "server:jobs": "backend/python_api/.venv/bin/python backend/python_api/app.py",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -12,6 +14,7 @@
   "dependencies": {
     "firebase": "^12.11.0",
     "lucide-react": "^0.577.0",
+    "openai": "^6.45.0",
     "pdfjs-dist": "^3.11.174",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

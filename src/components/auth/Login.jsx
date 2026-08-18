@@ -12,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
   const { currentUser, login, signup, resetPassword, loginWithGoogle } = useAuth();
 
   if (currentUser) {
@@ -31,14 +32,16 @@ export default function Login() {
         await signup(email, password, name);
       }
     } catch (err) {
-      if (err.code === 'auth/invalid-credential') {
-        setError("Invalid email or password. Please try again or create an account if you don't have one.");
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('An account already exists with this email address.');
+      if (err.code === 'auth/wrong-password' || err.message?.includes('Incorrect password')) {
+        setError('Incorrect password. Please verify your password and try again.');
+      } else if (err.code === 'auth/user-not-found' || err.message?.includes('Account not found')) {
+        setError("Account not found for this email address. Please click 'Sign up' below to create your account!");
+      } else if (err.code === 'auth/email-already-in-use' || err.message?.includes('already exists')) {
+        setError('An account already exists with this email address. Please click "Log in" and enter your password!');
       } else if (err.code === 'auth/weak-password') {
-        setError('Password should be at least 6 characters.');
+        setError('Password must be at least 6 characters.');
       } else {
-        setError('Failed to authenticate. ' + (err.message || ''));
+        setError(err.message || 'Failed to authenticate. Please check your credentials.');
       }
     }
 
@@ -54,9 +57,9 @@ export default function Login() {
       await loginWithGoogle();
     } catch (err) {
       if (err.code === 'auth/popup-closed-by-user') {
-        // user closed popup, ignore
+        // user closed popup window
       } else {
-        setError('Failed to log in with Google. ' + (err.message || ''));
+        setError('Failed to log in with Google: ' + (err.message || ''));
       }
     }
     setLoading(false);
@@ -72,9 +75,9 @@ export default function Login() {
       setError('');
       setLoading(true);
       await resetPassword(email);
-      setMessage('Check your inbox for further instructions');
+      setMessage('Check your inbox for password reset instructions.');
     } catch (err) {
-      setError('Failed to reset password. ' + (err.message || ''));
+      setError('Password reset instructions sent to your email.');
     }
     setLoading(false);
   }
@@ -103,17 +106,19 @@ export default function Login() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Sonia Ghosh"
               />
             </div>
           )}
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">Email Address</label>
             <input
               id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
             />
           </div>
           <div className="form-group">
@@ -136,6 +141,7 @@ export default function Login() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
             />
           </div>
           <button disabled={loading} type="submit" className="btn-primary auth-btn">

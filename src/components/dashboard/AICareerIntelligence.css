@@ -1,0 +1,148 @@
+.ai-hub-container {
+  padding: 10px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ai-hub-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.ai-hub-header h2 {
+  color: #6366f1;
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.ai-hub-header p {
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.ai-hub-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 850px) {
+  .ai-hub-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ai-hub-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  border: 1px solid #f1f5f9;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ai-card-title h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.icon-purple {
+  color: #6366f1;
+}
+
+.icon-blue {
+  color: #3b82f6;
+}
+
+.ai-card-desc {
+  color: #64748b;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.job-selector-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.job-selector-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ai-job-select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background-color: white;
+  font-size: 0.95rem;
+  color: #0f172a;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+
+.ai-job-select:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.ai-card-btn-primary {
+  width: 100%;
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  margin-top: auto; /* Pushes the button to the bottom if the card is tall */
+}
+
+.ai-card-btn-primary:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.ai-card-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Hide the inner header of AIResumeAnalyzer since we have our own */
+.ai-resume-analyzer-wrapper .ai-header {
+  display: none;
+}
+
+.ai-resume-analyzer-wrapper .ai-analyzer-container {
+  padding: 0;
+  margin: 0;
+  max-width: 100%;
+}

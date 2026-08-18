@@ -45,6 +45,7 @@
 .user-greeting {
   font-size: 0.9rem;
   color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .btn-primary {
@@ -79,4 +80,25 @@
 .btn-icon:hover {
   background-color: var(--border-color);
   color: var(--text-primary);
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background-color: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border-color: #f87171;
 }

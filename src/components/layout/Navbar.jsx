@@ -1,10 +1,18 @@
 import React from 'react';
-import { Briefcase, Plus, LogOut } from 'lucide-react';
+import { Briefcase, LogOut, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import './Navbar.css';
 
-export default function Navbar({ onAddApplication }) {
+export default function Navbar({ onAddApplication, onOpenProfile }) {
   const { currentUser, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Failed to log out:", err);
+    }
+  };
 
   return (
     <nav className="navbar">
@@ -22,11 +30,11 @@ export default function Navbar({ onAddApplication }) {
         {currentUser ? (
           <>
             <span className="user-greeting">Hi, {currentUser.displayName || currentUser.email}</span>
-            <button className="btn-primary" onClick={onAddApplication}>
-              <Plus size={18} /> Add Application
+            <button className="btn-icon" onClick={onOpenProfile} title="Profile Settings">
+              <User size={20} />
             </button>
-            <button className="btn-icon" onClick={logout} title="Logout">
-              <LogOut size={20} />
+            <button className="btn-logout" onClick={handleLogout} title="Log Out / Switch Account">
+              <LogOut size={16} /> Sign Out
             </button>
           </>
         ) : (
