@@ -1,13 +1,69 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, User, Briefcase, Mail, Phone, MapPin, 
-  Link as LinkIcon, Info, Globe, Camera, Plus, Trash2, Check, Key, Award, BookOpen, Sparkles, GraduationCap
+  Link as LinkIcon, Info, Globe, Camera, Plus, Trash2, Check, Key, Award, BookOpen, Sparkles, GraduationCap, CheckCircle2, Clock
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserProfile, updateUserProfile } from '../../services/db';
 import { updateProfile } from 'firebase/auth';
 import { AutocompleteInput, AutocompleteTextarea, SUGGESTION_DICTIONARY } from '../common/AutocompleteInput';
 import './Profile.css';
+
+export function calculateProfileCompletion(p) {
+  if (!p) return { percentage: 0, level: 'Getting Started', color: '#ef4444', items: [] };
+
+  let score = 0;
+  const items = [];
+
+  // Personal Info (20%)
+  if (p.fullName && p.fullName.trim()) score += 5; else items.push('Full Name');
+  if (p.professionalTitle && p.professionalTitle.trim()) score += 5; else items.push('Professional Title');
+  if (p.location && p.location.trim()) score += 5; else items.push('Location');
+  if (p.availability && p.availability.trim()) score += 5; else items.push('Availability Status');
+
+  // Contact (15%)
+  if (p.email && p.email.trim()) score += 5; else items.push('Email');
+  if (p.phone && p.phone.trim()) score += 5; else items.push('Phone Number');
+  if ((p.linkedIn && p.linkedIn.trim()) || (p.github && p.github.trim()) || (p.portfolio && p.portfolio.trim())) score += 5; else items.push('LinkedIn / Portfolio Link');
+
+  // Bio / Executive Summary (15%)
+  if (p.bio && p.bio.trim().length > 20) score += 15;
+  else if (p.bio && p.bio.trim()) score += 8;
+  else items.push('Executive Summary');
+
+  // Work Experience (15%)
+  if (Array.isArray(p.workExperience) && p.workExperience.some(w => w.title && w.company)) score += 15;
+  else items.push('Work Experience Role');
+
+  // Featured Projects (15%)
+  if (Array.isArray(p.projects) && p.projects.some(pr => pr.name)) score += 15;
+  else items.push('Featured Project');
+
+  // Technical Skills (10%)
+  if ((p.technicalSkills && p.technicalSkills.trim()) || (p.frameworks && p.frameworks.trim())) score += 10;
+  else items.push('Technical Skills');
+
+  // Education or Schooling (10%)
+  if ((Array.isArray(p.educationList) && p.educationList.some(e => e.degree || e.school)) || (Array.isArray(p.schoolingList) && p.schoolingList.some(s => s.schoolName))) score += 10;
+  else items.push('Higher Education / School Record');
+
+  const finalScore = Math.min(100, Math.max(0, score));
+
+  let level = 'Getting Started';
+  let color = '#ef4444';
+  if (finalScore >= 90) {
+    level = 'All-Star Profile';
+    color = '#10b981';
+  } else if (finalScore >= 70) {
+    level = 'Competitive CV';
+    color = '#3b82f6';
+  } else if (finalScore >= 45) {
+    level = 'Intermediate';
+    color = '#f59e0b';
+  }
+
+  return { percentage: finalScore, level, color, items };
+}
 
 export default function Profile({ onBack }) {
   const { currentUser, linkPassword } = useAuth();
@@ -35,9 +91,9 @@ export default function Profile({ onBack }) {
     portfolio: '',
     twitter: '',
     devBlog: '',
-    availability: 'Full-time',
+    availability: 'Immediately Available (0 Days Notice)',
     careerObjective: '',
-    showObjective: true,
+    showObjective: false,
     
     workExperience: [],
     projects: [],
@@ -247,6 +303,8 @@ export default function Profile({ onBack }) {
     return <div className="profile-loading">Loading CV configuration...</div>;
   }
 
+  const completionInfo = calculateProfileCompletion(formData);
+
   return (
     <div className="profile-container">
       <div className="profile-top-bar-wrapper">
@@ -279,6 +337,51 @@ export default function Profile({ onBack }) {
             accept="image/*" onChange={handleImageUpload}
           />
           <h3 className="profile-name">{formData.fullName || 'New User'}</h3>
+          <p style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.9rem', margin: '2px 0 0 0', fontWeight: 500 }}>
+            {formData.professionalTitle || 'Software Engineering Professional'}
+          </p>
+
+          <div className="profile-completion-card" style={{
+            marginTop: '16px',
+            background: 'rgba(255, 255, 255, 0.16)',
+            backdropFilter: 'blur(8px)',
+            padding: '12px 20px',
+            borderRadius: '14px',
+            maxWidth: '440px',
+            width: '100%',
+            border: '1px solid rgba(255, 255, 255, 0.28)',
+            color: 'white',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={16} color={completionInfo.color} /> Profile Strength Score
+              </span>
+              <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff' }}>
+                {completionInfo.percentage}% ({completionInfo.level})
+              </span>
+            </div>
+
+            <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.3)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${completionInfo.percentage}%`,
+                background: completionInfo.color,
+                borderRadius: '4px',
+                transition: 'width 0.5s ease-in-out'
+              }}></div>
+            </div>
+
+            {completionInfo.items.length > 0 ? (
+              <div style={{ marginTop: '8px', fontSize: '0.78rem', opacity: 0.9, textAlign: 'center' }}>
+                Add <strong>{completionInfo.items.slice(0, 2).join(', ')}</strong> to reach 100%
+              </div>
+            ) : (
+              <div style={{ marginTop: '8px', fontSize: '0.78rem', opacity: 0.9, textAlign: 'center', color: '#10b981', fontWeight: 600 }}>
+                ✓ Master CV Profile 100% Complete & Optimized!
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
