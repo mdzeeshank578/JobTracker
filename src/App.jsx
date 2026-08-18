@@ -247,7 +247,7 @@ function MainApp() {
           )}
 
           {currentTab === 'live-jobs' && (
-            <LiveJobs />
+            <LiveJobs trackedJobs={jobs} />
           )}
         </>
       )}

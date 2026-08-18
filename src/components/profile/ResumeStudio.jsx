@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Briefcase, PlusCircle, Brain, RefreshCw, Sparkles } from 'lucide-react';
+import { FileText, Download, Briefcase, PlusCircle, Brain, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserProfile, addJob } from '../../services/db';
 import { generateJobRecommendations, optimizeResumeContent } from '../../services/openai';
@@ -17,18 +17,24 @@ export default function ResumeStudio() {
 
   const [aiJobs, setAiJobs] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [addedJobsMap, setAddedJobsMap] = useState({});
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         if (currentUser) {
           const data = await getUserProfile(currentUser.uid);
-          if (data) {
-             setProfileData(data);
-             setDisplayData(data);
-             if (data.cvCustomization?.template) {
-               setCurrentTemplate(data.cvCustomization.template);
-             }
+          const active = data || {
+            fullName: currentUser.displayName || 'Candidate Profile',
+            email: currentUser.email || '',
+            professionalTitle: 'Software Engineering Professional',
+            bio: 'Experienced developer specializing in full stack web applications and scalable APIs.',
+            technicalSkills: 'JavaScript, React, Node.js, Python, SQL, Cloud Services'
+          };
+          setProfileData(active);
+          setDisplayData(active);
+          if (data?.cvCustomization?.template) {
+            setCurrentTemplate(data.cvCustomization.template);
           }
         }
       } catch (err) {
@@ -41,10 +47,16 @@ export default function ResumeStudio() {
   }, [currentUser]);
 
   const handleOptimizeContent = async () => {
-     if (!profileData) return;
+     const activeData = profileData || displayData || {
+       fullName: currentUser?.displayName || 'Candidate Profile',
+       email: currentUser?.email || '',
+       professionalTitle: 'Software Engineering Professional',
+       bio: 'Experienced developer specializing in full stack web applications.',
+       technicalSkills: 'JavaScript, React, Node.js, Python'
+     };
      setIsOptimizing(true);
      try {
-       const optimized = await optimizeResumeContent(profileData);
+       const optimized = await optimizeResumeContent(activeData);
        setDisplayData(optimized);
      } catch(err) {
        console.error("AI Error:", err);
@@ -59,36 +71,50 @@ export default function ResumeStudio() {
   };
 
   const handleAIAnalyze = async () => {
-    if (!profileData) return;
+    const activeData = profileData || displayData || {
+      fullName: currentUser?.displayName || 'Candidate Profile',
+      email: currentUser?.email || '',
+      professionalTitle: 'Software Engineering Professional',
+      bio: 'Experienced developer specializing in full stack web applications.',
+      technicalSkills: 'JavaScript, React, Node.js, Python, SQL'
+    };
+
     setIsAnalyzing(true);
     try {
-      const results = await generateJobRecommendations(profileData);
-      setAiJobs(results);
+      const results = await generateJobRecommendations(activeData);
+      setAiJobs(results || []);
+      setAddedJobsMap({});
     } catch (err) {
-      console.error(err);
-      alert("Failed to analyze resume for jobs.");
+      console.error("Failed to analyze resume for jobs:", err);
+      alert("Failed to analyze resume for jobs. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleSaveJob = async (job) => {
+  const handleSaveJob = async (job, index) => {
+    // Instant optimistic state update
+    setAddedJobsMap(prev => ({ ...prev, [index]: true }));
+    setAiJobs(prev => prev.map((j, i) => (i === index ? { ...j, added: true } : j)));
+
     try {
-      await addJob(currentUser.uid, {
+      await addJob(currentUser?.uid || 'guest', {
         company: job.company,
         role: job.role,
-        type: job.type,
+        type: job.type || 'Full-time',
         status: 'Applied',
         dateApplied: new Date().toISOString().split('T')[0],
-        deadline: job.deadline,
+        deadline: job.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         notes: `AI Recommended Match! Score: ${job.matchScore}. Reasoning: ${job.reasoning}`,
         resumeUrl: null,
         coverLetterUrl: null
       });
-      alert(`Successfully added ${job.role} at ${job.company} to your Tracker!`);
     } catch (error) {
-       console.error(error);
+       console.error("Failed to save AI job:", error);
        alert("Failed to save AI job.");
+       // Revert state on error
+       setAddedJobsMap(prev => ({ ...prev, [index]: false }));
+       setAiJobs(prev => prev.map((j, i) => (i === index ? { ...j, added: false } : j)));
     }
   };
 
@@ -682,10 +708,16 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
                        <p className="rec-reasoning">{job.reasoning}</p>
                        
                        <div className="rec-actions">
-                          <button className="btn-add-tracker" onClick={() => handleSaveJob(job)}>
-                             <PlusCircle size={16} style={{ color: '#2563eb' }}/> Tracker
-                          </button>
-                       </div>
+                           {(job.added || addedJobsMap[idx]) ? (
+                             <button className="btn-add-tracker" disabled style={{ background: '#10b981', color: 'white', border: 'none', fontWeight: 600, cursor: 'default', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <CheckCircle2 size={16} color="white" /> Added to Tracker
+                             </button>
+                           ) : (
+                             <button className="btn-add-tracker" onClick={() => handleSaveJob(job, idx)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <PlusCircle size={16} style={{ color: '#2563eb' }}/> Add to Tracker
+                             </button>
+                           )}
+                        </div>
                     </div>
                  ))}
               </div>

@@ -91,7 +91,8 @@ export default function Profile({ onBack }) {
     portfolio: '',
     twitter: '',
     devBlog: '',
-    availability: 'Immediately Available (0 Days Notice)',
+    availability: '',
+    workStatus: '',
     careerObjective: '',
     showObjective: false,
     
@@ -443,13 +444,23 @@ export default function Profile({ onBack }) {
                   </select>
                 </div>
                 <div className="input-with-icon">
-                  <label className="floating-label">Availability / Work Status</label>
+                  <label className="floating-label">Availability / Notice Period</label>
                   <Clock size={18} className="input-icon" />
                   <AutocompleteInput
                     value={formData.availability}
                     onChange={(val) => handleFieldUpdate('availability', val)}
                     placeholder="e.g. Immediately Available (0 Days Notice)"
                     suggestions={SUGGESTION_DICTIONARY.availability}
+                  />
+                </div>
+                <div className="input-with-icon">
+                  <label className="floating-label">Work / Employment Status</label>
+                  <Briefcase size={18} className="input-icon" />
+                  <AutocompleteInput
+                    value={formData.workStatus}
+                    onChange={(val) => handleFieldUpdate('workStatus', val)}
+                    placeholder="e.g. Currently Employed (Actively Looking)"
+                    suggestions={SUGGESTION_DICTIONARY.workStatuses}
                   />
                 </div>
               </div>

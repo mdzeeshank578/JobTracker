@@ -24,7 +24,7 @@ const initialFilters = {
 
 const filterChips = ['Remote', 'Hybrid', 'Onsite', 'Internship', 'Fresher', 'Experienced'];
 
-export default function LiveJobs() {
+export default function LiveJobs({ trackedJobs = [] }) {
   const { currentUser } = useAuth();
   const [filters, setFilters] = useState(initialFilters);
   const [jobs, setJobs] = useState([]);
@@ -34,6 +34,22 @@ export default function LiveJobs() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [autoApplyJob, setAutoApplyJob] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+
+  const getTrackedJobStatus = (job) => {
+    if (!trackedJobs || !Array.isArray(trackedJobs) || !job) return null;
+    const companyLower = (job.company || '').toLowerCase().trim();
+    const titleLower = (job.title || job.role || '').toLowerCase().trim();
+
+    const found = trackedJobs.find(t => {
+      const tCompany = (t.company || '').toLowerCase().trim();
+      const tRole = (t.role || t.title || '').toLowerCase().trim();
+      const companyMatch = tCompany === companyLower || tCompany.includes(companyLower) || companyLower.includes(tCompany);
+      const roleMatch = tRole === titleLower || tRole.includes(titleLower) || titleLower.includes(tRole);
+      return companyMatch && roleMatch;
+    });
+
+    return found ? (found.status || 'Applied') : null;
+  };
 
   useEffect(() => {
     async function fetchProfile() {
@@ -227,6 +243,7 @@ export default function LiveJobs() {
             <LiveJobCard
               key={job.id}
               job={job}
+              trackedStatus={getTrackedJobStatus(job)}
               onViewDetails={setSelectedJob}
               onApply={handleOpenApplyModal}
               onSave={handleSave}
@@ -254,7 +271,12 @@ export default function LiveJobs() {
         </div>
       )}
 
-      <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} onApply={handleOpenApplyModal} />
+      <JobDetailsModal
+        job={selectedJob}
+        trackedStatus={getTrackedJobStatus(selectedJob)}
+        onClose={() => setSelectedJob(null)}
+        onApply={handleOpenApplyModal}
+      />
       
       {autoApplyJob && (
         <AutoApplyModal

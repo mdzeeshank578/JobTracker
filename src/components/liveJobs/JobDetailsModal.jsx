@@ -1,5 +1,4 @@
-import React from 'react';
-import { ArrowUpRight, X } from 'lucide-react';
+import { ArrowUpRight, X, CheckCircle2 } from 'lucide-react';
 
 function Section({ title, items, fallback }) {
   if (!items?.length && !fallback) return null;
@@ -15,8 +14,9 @@ function Section({ title, items, fallback }) {
   );
 }
 
-export default function JobDetailsModal({ job, onClose, onApply }) {
+export default function JobDetailsModal({ job, onClose, onApply, trackedStatus }) {
   if (!job) return null;
+  const isAdded = Boolean(trackedStatus);
 
   return (
     <div className="job-detail-overlay" onClick={onClose}>
@@ -31,6 +31,12 @@ export default function JobDetailsModal({ job, onClose, onApply }) {
         </div>
 
         <div className="job-detail-body">
+          {isAdded && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', color: '#10b981', fontWeight: 600, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <CheckCircle2 size={16} /> This vacancy is already tracked in your applications ({trackedStatus}).
+            </div>
+          )}
+
           <Section title="Complete Job Description" fallback={job.description || 'The provider did not include a full description.'} />
           <Section title="Responsibilities" items={job.responsibilities} />
           <Section title="Required Skills" items={job.requiredSkills} />
@@ -45,9 +51,15 @@ export default function JobDetailsModal({ job, onClose, onApply }) {
 
         <div className="job-detail-footer">
           <a href={job.applyUrl} target="_blank" rel="noreferrer">Official Apply Link</a>
-          <button type="button" className="btn-primary-live" onClick={() => onApply(job)}>
-            Apply Now <ArrowUpRight size={16} />
-          </button>
+          {isAdded ? (
+            <button type="button" className="btn-primary-live" style={{ background: '#10b981', color: 'white', cursor: 'default' }}>
+              <CheckCircle2 size={16} /> Added to Tracker ({trackedStatus})
+            </button>
+          ) : (
+            <button type="button" className="btn-primary-live" onClick={() => onApply(job)}>
+              Apply Now <ArrowUpRight size={16} />
+            </button>
+          )}
         </div>
       </div>
     </div>

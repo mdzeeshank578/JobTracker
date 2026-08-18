@@ -8,9 +8,10 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function LiveJobCard({ job, onViewDetails, onApply, onSave }) {
+export default function LiveJobCard({ job, onViewDetails, onApply, onSave, trackedStatus }) {
   const ai = job.ai;
   const match = ai?.resumeMatchPercentage;
+  const isAdded = Boolean(trackedStatus);
 
   return (
     <article className="live-job-card">
@@ -22,7 +23,13 @@ export default function LiveJobCard({ job, onViewDetails, onApply, onSave }) {
           <h3>{job.title}</h3>
           <p>{job.company}</p>
         </div>
-        <span className="source-pill">{job.sourceApi}</span>
+        {isAdded ? (
+          <span className="source-pill" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <CheckCircle2 size={12} /> Added ({trackedStatus})
+          </span>
+        ) : (
+          <span className="source-pill">{job.sourceApi}</span>
+        )}
       </div>
 
       <div className="job-meta-row">
@@ -84,9 +91,15 @@ export default function LiveJobCard({ job, onViewDetails, onApply, onSave }) {
 
       <div className="job-actions">
         <button type="button" className="btn-muted" onClick={() => onViewDetails(job)}>View Details</button>
-        <button type="button" className="btn-primary-live" onClick={() => onApply(job)}>
-          Apply Now <ArrowUpRight size={16} />
-        </button>
+        {isAdded ? (
+          <button type="button" className="btn-primary-live" style={{ background: '#10b981', color: 'white', cursor: 'default' }} onClick={() => onViewDetails(job)}>
+            <CheckCircle2 size={16} /> Added ({trackedStatus})
+          </button>
+        ) : (
+          <button type="button" className="btn-primary-live" onClick={() => onApply(job)}>
+            Apply Now <ArrowUpRight size={16} />
+          </button>
+        )}
         <button type="button" className="btn-icon-live" onClick={() => onSave(job)} title="Save Job">
           <Bookmark size={17} />
         </button>

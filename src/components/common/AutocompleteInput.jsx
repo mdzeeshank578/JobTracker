@@ -559,11 +559,26 @@ export const SUGGESTION_DICTIONARY = {
     'Serving Notice Period (30 Days)',
     'Serving Notice Period (60 Days)',
     'Serving Notice Period (90 Days)',
-    'Actively Open to Opportunities',
-    'Passively Exploring Roles',
-    'Not Looking / Currently Employed',
-    'Available for Freelance / Contract Work',
-    'Available for Summer / Winter Internship'
+    'Available in 2 Weeks',
+    'Available in 1 Month',
+    'Available Post Graduation (June 2026)',
+    'Available for Immediate Joining',
+    'Available for Summer / Winter Internship',
+    'Part-Time / Contract Basis Available'
+  ],
+
+  workStatuses: [
+    'Currently Employed (Actively Looking)',
+    'Currently Employed (Passively Exploring)',
+    'Unemployed / Actively Job Hunting',
+    'Fresher / Recent Graduate (Entry Level)',
+    'Final Year Student / Campus Candidate',
+    'Freelancer / Independent Contractor',
+    'Serving Notice Period (Resigned)',
+    'Authorized to Work (Immediate Start)',
+    'Requires H1B / Work Visa Sponsorship',
+    'Open to Remote / Relocation Worldwide',
+    'Self-Employed / Founder'
   ],
 
   jobTitles: [
@@ -743,7 +758,7 @@ export function AutocompleteInput({ value, onChange, placeholder, suggestions = 
   };
 
   return (
-    <div className="autocomplete-wrapper" ref={wrapperRef} style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+    <div className="autocomplete-wrapper" ref={wrapperRef} style={{ position: 'relative', width: '100%', flex: 1, boxSizing: 'border-box' }}>
       <input
         id={id}
         name={name}
@@ -758,6 +773,7 @@ export function AutocompleteInput({ value, onChange, placeholder, suggestions = 
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         autoComplete="off"
+        style={{ width: '100%', boxSizing: 'border-box' }}
       />
       {isOpen && filtered.length > 0 && (
         <ul className="autocomplete-dropdown" style={{
@@ -766,16 +782,17 @@ export function AutocompleteInput({ value, onChange, placeholder, suggestions = 
           left: 0,
           right: 0,
           width: '100%',
+          maxWidth: '100%',
           boxSizing: 'border-box',
-          margin: '4px 0 0 0',
-          padding: '4px 0',
+          margin: 0,
+          padding: '6px 0',
           background: '#ffffff',
           border: '1px solid #cbd5e1',
-          borderRadius: '8px',
-          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
+          borderRadius: '10px',
+          boxShadow: '0 12px 28px rgba(15, 23, 42, 0.18)',
           maxHeight: '220px',
           overflowY: 'auto',
-          zIndex: 1000,
+          zIndex: 9999,
           listStyle: 'none'
         }}>
           {filtered.map((item, idx) => (
@@ -787,9 +804,30 @@ export function AutocompleteInput({ value, onChange, placeholder, suggestions = 
                 onChange(formatTitleCase(item));
                 setIsOpen(false);
               }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                textAlign: 'left',
+                padding: '8px 14px',
+                fontSize: '0.88rem',
+                color: '#1e293b',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
-              <Search size={14} style={{ opacity: 0.5, marginRight: 8, flexShrink: 0 }} />
-              <span>{item}</span>
+              <Search size={14} style={{ color: '#94a3b8', marginRight: '10px', flexShrink: 0 }} />
+              <span style={{ textAlign: 'left', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {item}
+              </span>
             </li>
           ))}
         </ul>

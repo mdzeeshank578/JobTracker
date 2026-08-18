@@ -120,6 +120,36 @@ export async function deleteJob(userId, jobId) {
 export async function getUserProfile(userId) {
   if (!userId) return null;
 
+  try {
+    const profileRef = doc(db, "users", userId, "profile", "info");
+    const docSnap = await getDoc(profileRef);
+    if (docSnap.exists()) {
+      const cloudData = docSnap.data();
+      // Sync cloud data to local account storage
+      localStorage.setItem(`jobtracker_user_profile_${userId}`, JSON.stringify(cloudData));
+
+      // Also sync resume text if present
+      if (cloudData.bio || cloudData.technicalSkills || cloudData.fullName) {
+        const textSummary = [
+          cloudData.fullName,
+          cloudData.professionalTitle,
+          cloudData.bio,
+          cloudData.technicalSkills,
+          cloudData.frameworks,
+          cloudData.tools,
+          Array.isArray(cloudData.workExperience) ? cloudData.workExperience.map(w => `${w.title} at ${w.company}: ${w.description}`).join('; ') : '',
+          Array.isArray(cloudData.projects) ? cloudData.projects.map(p => `${p.name}: ${p.description}`).join('; ') : ''
+        ].filter(Boolean).join('\n');
+        localStorage.setItem('jobTracker_resumeText', textSummary);
+      }
+
+      return cloudData;
+    }
+  } catch (err) {
+    console.warn("Firestore getUserProfile network warning, falling back to account storage:", err.message);
+  }
+
+  // Fallback to local storage for this specific account ID
   const localSaved = localStorage.getItem(`jobtracker_user_profile_${userId}`);
   if (localSaved) {
     try {
@@ -127,17 +157,6 @@ export async function getUserProfile(userId) {
     } catch (e) {}
   }
 
-  try {
-    const profileRef = doc(db, "users", userId, "profile", "info");
-    const docSnap = await getDoc(profileRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      localStorage.setItem(`jobtracker_user_profile_${userId}`, JSON.stringify(data));
-      return data;
-    }
-  } catch (err) {
-    console.warn("Firestore getUserProfile fallback to local:", err.message);
-  }
   return null;
 }
 
@@ -151,19 +170,29 @@ export async function updateUserProfile(userId, profileData) {
     }
   });
 
-  // 1. Instant local persistence
+  // 1. Instant account local persistence
   localStorage.setItem(`jobtracker_user_profile_${userId}`, JSON.stringify(cleanedData));
 
-  // 2. Non-blocking cloud sync with 2s timeout
+  // Sync resume text globally
+  const textSummary = [
+    cleanedData.fullName,
+    cleanedData.professionalTitle,
+    cleanedData.bio,
+    cleanedData.technicalSkills,
+    cleanedData.frameworks,
+    cleanedData.tools,
+    Array.isArray(cleanedData.workExperience) ? cleanedData.workExperience.map(w => `${w.title} at ${w.company}: ${w.description}`).join('; ') : '',
+    Array.isArray(cleanedData.projects) ? cleanedData.projects.map(p => `${p.name}: ${p.description}`).join('; ') : ''
+  ].filter(Boolean).join('\n');
+  localStorage.setItem('jobTracker_resumeText', textSummary);
+
+  // 2. Cloud sync with Firestore
   try {
     const profileRef = doc(db, "users", userId, "profile", "info");
-    const savePromise = setDoc(profileRef, {
+    await setDoc(profileRef, {
       ...cleanedData,
       updatedAt: Timestamp.now()
     }, { merge: true });
-
-    const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
-    await Promise.race([savePromise, timeoutPromise]);
   } catch (err) {
     console.warn("Firestore cloud sync notice:", err.message);
   }

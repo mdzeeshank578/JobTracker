@@ -319,6 +319,33 @@
   align-items: center;
   background: white;
   border-radius: 10px;
+  width: 100%;
+}
+
+.input-with-icon .autocomplete-wrapper {
+  width: 100%;
+  flex: 1;
+  display: flex;
+}
+
+.input-with-icon .autocomplete-wrapper input {
+  width: 100%;
+}
+
+.autocomplete-dropdown {
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.autocomplete-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: 100% !important;
 }
 
 .floating-label {
