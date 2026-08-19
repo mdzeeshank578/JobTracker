@@ -28,22 +28,73 @@ export function getJobsQuery(userId) {
 }
 
 export function subscribeToJobs(userId, callback) {
+  const safeUserId = userId || 'guest';
+  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
+  const globalKey = `jobtracker_global_saved_jobs`;
+
+  // 1. Immediately return cached jobs from account local storage to prevent data wipe on refresh
+  const loadLocalJobs = () => {
+    try {
+      const userCached = localStorage.getItem(storageKey);
+      const globalCached = localStorage.getItem(globalKey);
+      const userJobs = userCached ? JSON.parse(userCached) : [];
+      const globalJobs = globalCached ? JSON.parse(globalCached) : [];
+
+      // Combine unique jobs by ID or company+role
+      const jobMap = new Map();
+      [...userJobs, ...globalJobs].forEach(j => {
+        if (j && (j.id || (j.company && j.role))) {
+          const key = j.id || `${j.company}_${j.role}`;
+          if (!jobMap.has(key)) {
+            jobMap.set(key, j);
+          }
+        }
+      });
+      return Array.from(jobMap.values());
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const initialJobs = loadLocalJobs();
+  if (initialJobs.length > 0) {
+    callback(initialJobs);
+  }
+
   if (!userId) return () => {};
+
   const q = getJobsQuery(userId);
   if (!q) return () => {};
   
   return onSnapshot(q, (snapshot) => {
-    const jobs = snapshot.docs.map(doc => ({
+    const firestoreJobs = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data({ serverTimestamps: 'estimate' })
     }));
-    callback(jobs);
+
+    const combinedMap = new Map();
+    [...firestoreJobs, ...initialJobs].forEach(j => {
+      if (j && (j.id || (j.company && j.role))) {
+        const key = j.id || `${j.company}_${j.role}`;
+        combinedMap.set(key, j);
+      }
+    });
+    const finalJobs = Array.from(combinedMap.values());
+
+    // Cache updated jobs locally per account and globally
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(finalJobs));
+      localStorage.setItem(globalKey, JSON.stringify(finalJobs));
+    } catch (e) {
+      console.error("Error caching jobs:", e);
+    }
+
+    callback(finalJobs);
   });
 }
 
 export async function addJob(userId, jobData) {
-  if (!userId) throw new Error("User ID is required");
-  
+  const safeUserId = userId || 'guest';
   const cleanedJobData = { ...jobData };
   Object.keys(cleanedJobData).forEach(key => {
     if (cleanedJobData[key] === undefined) {
@@ -51,13 +102,39 @@ export async function addJob(userId, jobData) {
     }
   });
 
+  const tempId = `job_${Date.now()}`;
+  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
+  const globalKey = `jobtracker_global_saved_jobs`;
+
+  // 1. Optimistically update local account and global cache immediately
+  try {
+    const newJob = { id: tempId, ...cleanedJobData, userId: safeUserId, createdAt: new Date().toISOString() };
+    
+    const userCached = localStorage.getItem(storageKey);
+    let userJobs = userCached ? JSON.parse(userCached) : [];
+    userJobs = [newJob, ...userJobs.filter(j => j.id !== tempId)];
+    localStorage.setItem(storageKey, JSON.stringify(userJobs));
+
+    const globalCached = localStorage.getItem(globalKey);
+    let globalJobs = globalCached ? JSON.parse(globalCached) : [];
+    globalJobs = [newJob, ...globalJobs.filter(j => j.id !== tempId)];
+    localStorage.setItem(globalKey, JSON.stringify(globalJobs));
+  } catch (e) {}
+
+  if (!userId) return { id: tempId };
+
+  // 2. Perform Firestore write with a 2-second safety timeout guard
   const jobsRef = collection(db, "users", userId, "jobs");
-  return await addDoc(jobsRef, {
+  const firestorePromise = addDoc(jobsRef, {
     ...cleanedJobData,
     userId,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now()
   });
+
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ id: tempId }), 2000));
+  const docRef = await Promise.race([firestorePromise, timeoutPromise]);
+  return docRef || { id: tempId };
 }
 
 export async function saveJobForLater(userId, jobData) {
@@ -94,7 +171,8 @@ export function subscribeToSavedJobs(userId, callback) {
 }
 
 export async function updateJob(userId, jobId, jobData) {
-  if (!userId || !jobId) throw new Error("User ID and Job ID are required");
+  const safeUserId = userId || 'guest';
+  if (!jobId) throw new Error("Job ID is required");
 
   const cleanedJobData = { ...jobData };
   Object.keys(cleanedJobData).forEach(key => {
@@ -103,18 +181,60 @@ export async function updateJob(userId, jobId, jobData) {
     }
   });
 
+  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
+  const globalKey = `jobtracker_global_saved_jobs`;
+
+  // 1. Immediately update local account cache and global cache
+  try {
+    const updateList = (cachedStr) => {
+      if (!cachedStr) return [];
+      let jobs = JSON.parse(cachedStr);
+      return jobs.map(j => j.id === jobId ? { ...j, ...cleanedJobData, updatedAt: new Date().toISOString() } : j);
+    };
+
+    localStorage.setItem(storageKey, JSON.stringify(updateList(localStorage.getItem(storageKey))));
+    localStorage.setItem(globalKey, JSON.stringify(updateList(localStorage.getItem(globalKey))));
+  } catch (e) {}
+
+  if (!userId) return true;
+
+  // 2. Perform Firestore update with a 2-second safety timeout guard
   const jobRef = doc(db, "users", userId, "jobs", jobId);
-  return await updateDoc(jobRef, {
+  const firestorePromise = updateDoc(jobRef, {
     ...cleanedJobData,
     userId,
     updatedAt: Timestamp.now()
   });
+
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(true), 2000));
+  await Promise.race([firestorePromise, timeoutPromise]);
+  return true;
 }
 
 export async function deleteJob(userId, jobId) {
-  if (!userId || !jobId) throw new Error("User ID and Job ID are required");
+  const safeUserId = userId || 'guest';
+  if (!jobId) throw new Error("Job ID is required");
+
+  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
+  const globalKey = `jobtracker_global_saved_jobs`;
+
+  // Update local cache and global cache
+  try {
+    const filterList = (cachedStr) => {
+      if (!cachedStr) return [];
+      let jobs = JSON.parse(cachedStr);
+      return jobs.filter(j => j.id !== jobId);
+    };
+
+    localStorage.setItem(storageKey, JSON.stringify(filterList(localStorage.getItem(storageKey))));
+    localStorage.setItem(globalKey, JSON.stringify(filterList(localStorage.getItem(globalKey))));
+  } catch (e) {}
+
+  if (!userId) return true;
+
   const jobRef = doc(db, "users", userId, "jobs", jobId);
-  return await deleteDoc(jobRef);
+  const result = await deleteDoc(jobRef);
+  return result;
 }
 
 export async function getUserProfile(userId) {

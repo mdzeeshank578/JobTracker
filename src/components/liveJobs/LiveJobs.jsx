@@ -24,7 +24,7 @@ const initialFilters = {
 
 const filterChips = ['Remote', 'Hybrid', 'Onsite', 'Internship', 'Fresher', 'Experienced'];
 
-export default function LiveJobs({ trackedJobs = [] }) {
+export default function LiveJobs({ trackedJobs = [], onStartPractice }) {
   const { currentUser } = useAuth();
   const [filters, setFilters] = useState(initialFilters);
   const [jobs, setJobs] = useState([]);
@@ -284,6 +284,7 @@ export default function LiveJobs({ trackedJobs = [] }) {
           onClose={() => setAutoApplyJob(null)}
           onConfirmApply={handleConfirmApply}
           userProfile={userProfile}
+          onStartPractice={onStartPractice}
         />
       )}
     </main>

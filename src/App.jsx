@@ -14,6 +14,7 @@ import ResumeStudio from './components/profile/ResumeStudio';
 import ChatAssistant from './components/dashboard/ChatAssistant';
 import SyncCenter from './components/dashboard/SyncCenter';
 import LiveJobs from './components/liveJobs/LiveJobs';
+import FourRoundPracticeModal from './components/interview/FourRoundPracticeModal';
 import { subscribeToJobs, addJob, updateJob, deleteJob, uploadDocument } from './services/db';
 
 function ProtectedRoute({ children }) {
@@ -24,21 +25,58 @@ function ProtectedRoute({ children }) {
 
 function MainApp() {
   const { currentUser } = useAuth();
-  const [jobs, setJobs] = useState([]);
+  const [jobs, setJobs] = useState(() => {
+    try {
+      const globalCached = localStorage.getItem('jobtracker_global_saved_jobs');
+      const userKey = currentUser?.uid ? `jobtracker_user_jobs_${currentUser.uid}` : 'jobtracker_user_jobs_guest';
+      const userCached = localStorage.getItem(userKey);
+      const uJobs = userCached ? JSON.parse(userCached) : [];
+      const gJobs = globalCached ? JSON.parse(globalCached) : [];
+      
+      const jobMap = new Map();
+      [...uJobs, ...gJobs].forEach(j => {
+        if (j && (j.id || (j.company && j.role))) {
+          const key = j.id || `${j.company}_${j.role}`;
+          jobMap.set(key, j);
+        }
+      });
+      return Array.from(jobMap.values());
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [currentTab, setCurrentTab] = useState('overview');
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
+  const [practiceJob, setPracticeJob] = useState(null);
 
   // Job Form Modal State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
 
   useEffect(() => {
-    if (!currentUser) return;
-    const unsubscribe = subscribeToJobs(currentUser.uid, (data) => {
+    const unsubscribe = subscribeToJobs(currentUser?.uid || 'guest', (data) => {
       setJobs(data);
     });
     return () => unsubscribe();
   }, [currentUser]);
+
+  // Global listener for 4-Round Practice Session requests
+  useEffect(() => {
+    function handlePracticeRequest(e) {
+      if (e.detail) {
+        setPracticeJob(e.detail);
+      }
+    }
+    window.startPracticeSession = (job) => {
+      setPracticeJob(job);
+    };
+    window.addEventListener('start-4-round-practice', handlePracticeRequest);
+    return () => {
+      window.removeEventListener('start-4-round-practice', handlePracticeRequest);
+      delete window.startPracticeSession;
+    };
+  }, []);
 
   // Handle Sync Center OAuth callbacks
   useEffect(() => {
@@ -100,6 +138,14 @@ function MainApp() {
     try {
       const finalJobData = { ...jobData };
 
+      // Auto-attach candidate active Master CV if no custom resumeUrl attached
+      const activeCvUrl = localStorage.getItem('jobTracker_resumeUrl') || null;
+      const activeCvName = localStorage.getItem('jobTracker_resumeName') || 'Master_CV.pdf';
+      if (!finalJobData.resumeUrl && activeCvUrl) {
+        finalJobData.resumeUrl = activeCvUrl;
+        finalJobData.resumeName = activeCvName;
+      }
+
       // Firestore rejects explicitly undefined values. Let's delete them.
       Object.keys(finalJobData).forEach(key => {
         if (finalJobData[key] === undefined) {
@@ -109,13 +155,14 @@ function MainApp() {
 
       let savedJobId = null;
 
-      if (editingJob) {
+      if (editingJob && editingJob.id) {
         savedJobId = editingJob.id;
         await updateJob(currentUser.uid, savedJobId, finalJobData);
       } else {
         const docRef = await addJob(currentUser.uid, finalJobData);
         savedJobId = docRef.id;
       }
+      setEditingJob(null);
 
       // Helper to convert File to Base64
       const fileToBase64 = (file) =>
@@ -221,6 +268,7 @@ function MainApp() {
             onSaveGlobal={handleSaveGlobalJob}
             globalSearchTerm={globalSearchTerm}
             setGlobalSearchTerm={setGlobalSearchTerm}
+            onStartPractice={(job) => setPracticeJob(job)}
           />
 
           {currentTab === 'applications' && (
@@ -231,6 +279,7 @@ function MainApp() {
               onSaveGlobal={handleSaveGlobalJob}
               globalSearchTerm={globalSearchTerm}
               setGlobalSearchTerm={setGlobalSearchTerm}
+              onStartPractice={(job) => setPracticeJob(job)}
             />
           )}
 
@@ -247,7 +296,7 @@ function MainApp() {
           )}
 
           {currentTab === 'live-jobs' && (
-            <LiveJobs trackedJobs={jobs} />
+            <LiveJobs trackedJobs={jobs} onStartPractice={(job) => setPracticeJob(job)} />
           )}
         </>
       )}
@@ -258,6 +307,13 @@ function MainApp() {
         onSubmit={handleFormSubmit}
         initialData={editingJob}
       />
+      {practiceJob && (
+        <FourRoundPracticeModal
+          key={practiceJob.id || `${practiceJob.company}_${practiceJob.role}`}
+          job={practiceJob}
+          onClose={() => setPracticeJob(null)}
+        />
+      )}
       <ChatAssistant jobs={jobs} />
     </div>
   );

@@ -170,11 +170,30 @@ export default function JobCard({ job, onEdit, onDelete, isGlobal = false, onSav
         </div>
       )}
 
-      {((job.resumeUrl || job.coverLetterUrl) || (job.attachments && job.attachments.length > 0)) && (
-        <div className="job-documents">
-          {job.resumeUrl && (
-            <a href={job.resumeUrl} target="_blank" rel="noopener noreferrer" className="document-link" download="Resume.pdf">
-              <FileText size={14} /> Resume
+      {((job.resumeUrl || localStorage.getItem('jobTracker_resumeUrl') || job.coverLetterUrl) || (job.attachments && job.attachments.length > 0)) && (
+        <div className="job-documents" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+          {(job.resumeUrl || localStorage.getItem('jobTracker_resumeUrl')) && (
+            <a 
+              href={job.resumeUrl || localStorage.getItem('jobTracker_resumeUrl')} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="document-link" 
+              download={job.resumeName || 'Master_CV.pdf'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                color: '#2563eb',
+                background: '#eff6ff',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: '1px solid #bfdbfe',
+                textDecoration: 'none'
+              }}
+            >
+              <FileText size={14} /> {job.resumeName || localStorage.getItem('jobTracker_resumeName') || 'Master_CV.pdf'}
             </a>
           )}
           {job.coverLetterUrl && (
@@ -255,29 +274,37 @@ export default function JobCard({ job, onEdit, onDelete, isGlobal = false, onSav
           ) : (
             <>
               <button 
-                className="btn-icon" 
-                onClick={async () => {
-                  if (showPrep) {
-                    setShowPrep(false);
-                    return;
+                type="button"
+                className="btn-practice-rounds"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (typeof window.startPracticeSession === 'function') {
+                    window.startPracticeSession(job);
+                  } else if (onStartPractice) {
+                    onStartPractice(job);
+                  } else {
+                    window.dispatchEvent(new CustomEvent('start-4-round-practice', { detail: job }));
                   }
-                  setShowPrep(true);
-                  if (!prepData) {
-                    setIsLoadingPrep(true);
-                    try {
-                      const data = await generateInterviewPrep(job.role, job.company);
-                      setPrepData(data);
-                    } catch(err) {
-                      console.error(err);
-                    } finally {
-                      setIsLoadingPrep(false);
-                    }
-                  }
-                }} 
-                title="Interview Prep 🎯" 
-                style={{ color: showPrep ? '#4f46e5' : '#64748b' }}
+                }}
+                title="Start 4-Round Last-Minute Practice (Quant, Coding, Technical, HR)"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                  color: 'white',
+                  border: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                  transition: 'all 0.2s'
+                }}
               >
-                <Target size={16} />
+                <Target size={14} /> 4-Round Practice
               </button>
               <button className="btn-icon" onClick={() => onEdit(job)} title="Edit">
                 <Edit2 size={16} />

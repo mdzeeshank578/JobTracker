@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, User, Briefcase, Mail, Phone, MapPin, 
-  Link as LinkIcon, Info, Globe, Camera, Plus, Trash2, Check, Key, Award, BookOpen, Sparkles, GraduationCap, CheckCircle2, Clock
+  Link as LinkIcon, Info, Globe, Camera, Plus, Trash2, Check, Key, Award, BookOpen, Sparkles, GraduationCap, CheckCircle2, Clock, FileText, Upload
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserProfile, updateUserProfile } from '../../services/db';
@@ -205,6 +205,21 @@ export default function Profile({ onBack }) {
       newArray[index] = { ...newArray[index], [field]: value };
       return { ...prev, [arrayName]: newArray };
     });
+  };
+
+  const handleCertFileUpload = (index, file) => {
+    if (!file) return;
+    const MAX_SIZE = 700 * 1024; // 700KB
+    if (file.size > MAX_SIZE) {
+      alert("Certificate document is too large. Please keep it under 700KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      handleArrayChange('certifications', index, 'fileUrl', reader.result);
+      handleArrayChange('certifications', index, 'fileName', file.name);
+    };
   };
 
   const handleImageUpload = async (e) => {
@@ -1009,15 +1024,51 @@ export default function Profile({ onBack }) {
                           suggestions={SUGGESTION_DICTIONARY.certifications}
                         />
                       </div>
-                      <div className="input-with-icon">
-                        <label className="floating-label">Verification / Credential Link</label>
-                        <LinkIcon size={18} className="input-icon" />
-                        <input type="url" value={cert.link} onChange={e => handleArrayChange('certifications', idx, 'link', e.target.value)} placeholder="https://credly.com/..." />
+                      <div className="input-with-icon" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '2px' }}>
+                          Upload Certificate File (PDF / Image)
+                        </label>
+                        {cert.fileUrl ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                            <a 
+                              href={cert.fileUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              download={cert.fileName || 'Certificate.pdf'}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#166534', textDecoration: 'none' }}
+                            >
+                              <FileText size={16} /> {cert.fileName || 'Attached_Certificate.pdf'}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleArrayChange('certifications', idx, 'fileUrl', '');
+                                handleArrayChange('certifications', idx, 'fileName', '');
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input 
+                              type="file" 
+                              accept=".pdf,.png,.jpg,.jpeg" 
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleCertFileUpload(idx, e.target.files[0]);
+                                }
+                              }}
+                              style={{ fontSize: '0.85rem' }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                 ))}
-                <button className="add-item-btn" onClick={() => addArrayItem('certifications', {name:'', link:''})}>
+                <button className="add-item-btn" onClick={() => addArrayItem('certifications', {name:'', fileUrl:'', fileName:''})}>
                   <Plus size={18}/> Add Certification
                 </button>
               </div>

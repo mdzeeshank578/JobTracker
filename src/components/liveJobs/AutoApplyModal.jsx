@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, FileText, CheckCircle2, Sparkles, Building2, User, Mail, Phone, MapPin, Link as LinkIcon, Globe, ShieldCheck, ExternalLink } from 'lucide-react';
 import './AutoApplyModal.css';
 
-export default function AutoApplyModal({ job, onClose, onConfirmApply, userProfile }) {
+export default function AutoApplyModal({ job, onClose, onConfirmApply, userProfile, onStartPractice }) {
   if (!job) return null;
 
   const [formData, setFormData] = useState({
@@ -98,7 +98,34 @@ ${candidateName}`;
               <div><span>Applied On:</span> <strong>{new Date().toLocaleDateString()}</strong></div>
             </div>
 
-            <div className="success-actions">
+            <div className="success-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px', justifyContent: 'center' }}>
+              {onStartPractice && (
+                <button
+                  type="button"
+                  className="btn-practice-now"
+                  onClick={() => {
+                    onClose();
+                    if (onStartPractice) onStartPractice(job);
+                    window.dispatchEvent(new CustomEvent('start-4-round-practice', { detail: job }));
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                    color: 'white',
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)'
+                  }}
+                >
+                  <Sparkles size={16} /> ⚡ Start 4-Round Practice Session Now
+                </button>
+              )}
               {job.applyUrl && (
                 <a href={job.applyUrl} target="_blank" rel="noreferrer" className="btn-secondary-link">
                   View Official Company Listing <ExternalLink size={14} />

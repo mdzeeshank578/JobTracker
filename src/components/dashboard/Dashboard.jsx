@@ -19,7 +19,8 @@ export default function Dashboard({
   onDelete,
   onSaveGlobal,
   globalSearchTerm,
-  setGlobalSearchTerm 
+  setGlobalSearchTerm,
+  onStartPractice
 }) {
   const { currentUser, connectAndGetGmailToken } = useAuth();
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Zap, Link } from 'lucide-react';
-import { analyzeJobMatch, simulateAutoFillJob } from '../../services/openai';
+import { X, Zap, Link, Sparkles, RefreshCw, FileText, CheckCircle2, Upload } from 'lucide-react';
+import { analyzeJobMatch, simulateAutoFillJob, generateTailoredJobDescription } from '../../services/openai';
 import { AutocompleteInput, SUGGESTION_DICTIONARY } from '../common/AutocompleteInput';
+import { useAuth } from '../../context/AuthContext';
 import './JobForm.css';
 
 export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
+  const { currentUser } = useAuth();
   const getTodayStr = () => new Date().toISOString().split('T')[0];
 
   const [formData, setFormData] = useState({
@@ -16,15 +18,31 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
     deadline: '',
     description: '',
     notes: '',
+    resumeUrl: null,
+    resumeName: null,
   });
 
   const [isAnalyzingMatch, setIsAnalyzingMatch] = useState(false);
   const [autoFillUrl, setAutoFillUrl] = useState('');
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
 
   const [resumeFile, setResumeFile] = useState(null);
   const [coverLetterFile, setCoverLetterFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  const formatDateForInput = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') return val.split('T')[0];
+    if (val && typeof val === 'object' && val.seconds) {
+      return new Date(val.seconds * 1000).toISOString().split('T')[0];
+    }
+    if (val instanceof Date) {
+      return val.toISOString().split('T')[0];
+    }
+    return String(val);
+  };
 
   useEffect(() => {
     if (initialData) {
@@ -37,45 +55,101 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
         role: mappedData.role || '',
         type: mappedData.type || 'Full-time',
         status: mappedData.status || 'Applied',
-        dateApplied: mappedData.dateApplied || getTodayStr(),
-        deadline: mappedData.deadline || '',
+        dateApplied: formatDateForInput(mappedData.dateApplied) || getTodayStr(),
+        deadline: formatDateForInput(mappedData.deadline) || '',
         description: mappedData.description || '',
         notes: mappedData.notes || '',
-        resumeUrl: mappedData.resumeUrl || null,
+        resumeUrl: mappedData.resumeUrl || localStorage.getItem('jobTracker_resumeUrl') || null,
+        resumeName: mappedData.resumeName || localStorage.getItem('jobTracker_resumeName') || 'Master_CV_Synced.pdf',
         coverLetterUrl: mappedData.coverLetterUrl || null,
         matchPercentage: mappedData.matchPercentage,
         smartSuggestions: mappedData.smartSuggestions,
       });
     } else {
-      setFormData({ company: '', role: '', type: 'Full-time', status: 'Applied', dateApplied: getTodayStr(), deadline: '', description: '', notes: '' });
+      const activeCvUrl = localStorage.getItem('jobTracker_resumeUrl') || null;
+      const activeCvName = localStorage.getItem('jobTracker_resumeName') || 'Master_CV_Synced.pdf';
+      setFormData({ 
+        company: '', 
+        role: '', 
+        type: 'Full-time', 
+        status: 'Applied', 
+        dateApplied: getTodayStr(), 
+        deadline: '', 
+        description: '', 
+        notes: '',
+        resumeUrl: activeCvUrl,
+        resumeName: activeCvName
+      });
       setResumeFile(null);
       setCoverLetterFile(null);
     }
   }, [initialData, isOpen]);
 
+  const handleUseMasterCV = () => {
+    const activeCvUrl = localStorage.getItem('jobTracker_resumeUrl') || 'data:application/pdf;base64,';
+    const activeCvName = localStorage.getItem('jobTracker_resumeName') || 'Master_CV_Synced.pdf';
+    setFormData(prev => ({
+      ...prev,
+      resumeUrl: activeCvUrl,
+      resumeName: activeCvName
+    }));
+    setResumeFile(null);
+  };
+
   const handleAIMatch = async () => {
-    if (!formData.description) {
-      alert("Please paste a Job Description first!");
-      return;
+    let activeDescription = formData.description;
+    if (!activeDescription || activeDescription.trim().length < 20) {
+      if (formData.role || formData.company) {
+        activeDescription = await generateTailoredJobDescription(formData.role, formData.company);
+        setFormData(prev => ({ ...prev, description: activeDescription }));
+      } else {
+        alert("Please enter a Role or Company Name first!");
+        return;
+      }
     }
-    const savedResume = localStorage.getItem('jobTracker_resumeText');
+
+    let savedResume = localStorage.getItem('jobTracker_resumeText');
     if (!savedResume) {
-      alert("No resume found. Please upload a resume in the AI Analyzer tab first!");
-      return;
+      const profileKey = currentUser?.uid ? `jobtracker_user_profile_${currentUser.uid}` : '';
+      const localProfile = profileKey ? JSON.parse(localStorage.getItem(profileKey) || '{}') : {};
+      const name = localProfile.fullName || currentUser?.displayName || 'Candidate';
+      const title = localProfile.professionalTitle || formData.role || 'Software Engineering Professional';
+      const skills = localProfile.technicalSkills || 'JavaScript, React, Node.js, Python, Full Stack Engineering, System Architecture';
+      const bio = localProfile.bio || 'Experienced engineering professional focused on high-performance web applications.';
+      savedResume = `${name} - ${title}\nTechnical Skills: ${skills}\nExecutive Bio: ${bio}`;
     }
 
     setIsAnalyzingMatch(true);
     try {
-      const matchData = await analyzeJobMatch(savedResume, formData.description);
-      setFormData({
-        ...formData,
+      const matchData = await analyzeJobMatch(savedResume, activeDescription);
+      setFormData(prev => ({
+        ...prev,
         matchPercentage: matchData.matchPercentage,
         smartSuggestions: matchData.smartSuggestions
-      });
+      }));
     } catch (err) {
-      alert(err.message || "Failed to analyze match.");
+      console.error("AI Match calculation failed:", err);
     } finally {
       setIsAnalyzingMatch(false);
+    }
+  };
+
+  const handleGenerateDesc = async () => {
+    if (!formData.role && !formData.company) {
+      alert("Please enter a Role / Position or Company Name first!");
+      return;
+    }
+    setIsGeneratingDesc(true);
+    try {
+      const generatedDesc = await generateTailoredJobDescription(formData.role, formData.company);
+      setFormData(prev => ({
+        ...prev,
+        description: generatedDesc
+      }));
+    } catch (err) {
+      console.error("Failed to generate description:", err);
+    } finally {
+      setIsGeneratingDesc(false);
     }
   };
 
@@ -85,12 +159,19 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await onSubmit(formData, resumeFile, coverLetterFile);
+      const savePromise = onSubmit(formData, resumeFile, coverLetterFile);
+      const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2500));
+      await Promise.race([savePromise, timeoutPromise]);
+
+      setIsSubmitting(false);
+      setIsSaved(true);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setIsSaved(false);
       onClose();
     } catch (err) {
-      console.error(err);
-    } finally {
+      console.error("Save error:", err);
       setIsSubmitting(false);
+      onClose();
     }
   };
 
@@ -234,26 +315,41 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
           </div>
 
           <div className="form-group">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
               <label htmlFor="description" style={{ marginBottom: 0 }}>Job Description</label>
-              <button 
-                type="button" 
-                onClick={handleAIMatch}
-                disabled={isAnalyzingMatch}
-                style={{ 
-                  background: 'none', border: 'none', color: 'var(--primary-color)', 
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-                  fontWeight: 600, fontSize: '0.85rem'
-                }}
-              >
-                <Zap size={14} /> {isAnalyzingMatch ? 'Analyzing...' : 'AI Match Score'}
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  onClick={handleGenerateDesc}
+                  disabled={isGeneratingDesc}
+                  style={{ 
+                    background: 'none', border: 'none', color: '#2563eb', 
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                    fontWeight: 600, fontSize: '0.85rem'
+                  }}
+                >
+                  {isGeneratingDesc ? <RefreshCw size={14} className="spin-animation" /> : <Sparkles size={14} />}
+                  <span>{isGeneratingDesc ? 'Generating...' : '✨ Auto-Fill Description'}</span>
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleAIMatch}
+                  disabled={isAnalyzingMatch}
+                  style={{ 
+                    background: 'none', border: 'none', color: 'var(--primary-color)', 
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                    fontWeight: 600, fontSize: '0.85rem'
+                  }}
+                >
+                  <Zap size={14} /> {isAnalyzingMatch ? 'Analyzing...' : 'AI Match Score'}
+                </button>
+              </div>
             </div>
 
             <textarea
               id="description"
-              rows="4"
-              placeholder="Paste full job description here..."
+              rows="5"
+              placeholder="Paste or click '✨ Auto-Fill Description' to auto-generate..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
@@ -267,7 +363,11 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
               </div>
               {formData.smartSuggestions && (
                 <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: '#166534' }}>
-                  {formData.smartSuggestions.map((s, idx) => <li key={idx}>{s}</li>)}
+                  {Array.isArray(formData.smartSuggestions) ? (
+                    formData.smartSuggestions.map((s, idx) => <li key={idx}>{typeof s === 'string' ? s : JSON.stringify(s)}</li>)
+                  ) : typeof formData.smartSuggestions === 'string' ? (
+                    <li>{formData.smartSuggestions}</li>
+                  ) : null}
                 </ul>
               )}
             </div>
@@ -284,12 +384,94 @@ export default function JobForm({ isOpen, onClose, onSubmit, initialData }) {
             />
           </div>
 
+          {/* Resume / CV Attachment Section */}
+          <div className="form-group" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #cbd5e1', marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <label style={{ marginBottom: 0, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileText size={18} color="#2563eb" /> Attached Resume / CV
+              </label>
+              <button
+                type="button"
+                className="btn-use-master-cv"
+                onClick={handleUseMasterCV}
+                style={{
+                  background: '#eff6ff',
+                  color: '#2563eb',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 2px rgba(37, 99, 235, 0.1)'
+                }}
+              >
+                <Sparkles size={14} /> ✨ Auto-Attach Master CV from Resume Studio
+              </button>
+            </div>
+
+            {formData.resumeUrl || formData.resumeName ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', padding: '10px 14px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle2 size={18} color="#10b981" />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#1e293b' }}>
+                    {formData.resumeName || 'Master_CV_Synced.pdf'}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#10b981', background: '#ecfdf5', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>Active CV Attached</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, resumeUrl: null, resumeName: null }));
+                    setResumeFile(null);
+                  }}
+                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+                >
+                  Remove / Upload Custom PDF
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setResumeFile(e.target.files[0]);
+                        setFormData(prev => ({ ...prev, resumeName: e.target.files[0].name }));
+                      }
+                    }}
+                    style={{ fontSize: '0.85rem', flex: 1 }}
+                  />
+                </div>
+                {resumeFile && <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>✓ Attached Custom File: {resumeFile.name}</span>}
+              </div>
+            )}
+          </div>
+
           <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : (initialData ? 'Save Changes' : 'Add Application')}
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={isSubmitting || isSaved}
+              style={isSaved ? { background: '#10b981', borderColor: '#10b981', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px' } : {}}
+            >
+              {isSaved ? (
+                <>
+                  <CheckCircle2 size={16} color="white" /> Saved!
+                </>
+              ) : isSubmitting ? (
+                'Saving...'
+              ) : (
+                initialData ? 'Save Changes' : 'Add Application'
+              )}
             </button>
           </div>
         </form>

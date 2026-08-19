@@ -4,7 +4,7 @@ import JobCard from './JobCard';
 import { searchGlobalJobs } from '../../services/openai';
 import './JobList.css';
 
-export default function JobList({ jobs, onEdit, onDelete, onSaveGlobal, globalSearchTerm = '', setGlobalSearchTerm }) {
+export default function JobList({ jobs, onEdit, onDelete, onSaveGlobal, globalSearchTerm = '', setGlobalSearchTerm, onStartPractice }) {
   const [searchTerm, setSearchTerm] = useState(globalSearchTerm);
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterType, setFilterType] = useState('All');
@@ -108,6 +108,7 @@ export default function JobList({ jobs, onEdit, onDelete, onSaveGlobal, globalSe
               job={job} 
               onEdit={onEdit} 
               onDelete={onDelete} 
+              onStartPractice={onStartPractice}
             />
           ))
         ) : (
