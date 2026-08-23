@@ -48,22 +48,12 @@ export default function Login() {
     setLoading(false);
   }
 
-  async function handleGoogleLogin(e) {
+  const handleGoogleClick = (e) => {
     e.preventDefault();
     setError('');
-    setMessage('');
-    setLoading(true);
-    try {
-      await loginWithGoogle();
-    } catch (err) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        // user closed popup window
-      } else {
-        setError('Failed to log in with Google: ' + (err.message || ''));
-      }
-    }
-    setLoading(false);
-  }
+    // Direct trigger: Open official Google OAuth consent window immediately
+    loginWithGoogle();
+  };
 
   async function handleResetPassword(e) {
     e.preventDefault();
@@ -89,31 +79,34 @@ export default function Login() {
           <div className="logo-container auth-logo">
             <Briefcase size={28} color="white" />
           </div>
-          <h2>{isLogin ? 'Welcome back' : 'Create an account'}</h2>
-          <p>to track your job applications</p>
+          <h2>{isLogin ? 'Welcome back' : 'Create an Account'}</h2>
+          <p className="auth-subtitle">
+            {isLogin 
+              ? 'to track your job applications' 
+              : 'Start tracking your software engineering job applications'}
+          </p>
         </div>
 
-        {error && <div className="auth-error">{error}</div>}
-        {message && <div className="auth-message" style={{backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #10b981', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1rem', fontSize: '0.875rem', textAlign: 'center'}}>{message}</div>}
+        {error && <div className="auth-alert alert-error">{error}</div>}
+        {message && <div className="auth-alert alert-success">{message}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           {!isLogin && (
             <div className="form-group">
-              <label htmlFor="name">Full Name</label>
+              <label>Full Name</label>
               <input
-                id="name"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sonia Ghosh"
+                placeholder="John Doe"
               />
             </div>
           )}
+
           <div className="form-group">
-            <label htmlFor="email">Email Address</label>
+            <label>Email Address</label>
             <input
-              id="email"
               type="email"
               required
               value={email}
@@ -121,22 +114,21 @@ export default function Login() {
               placeholder="name@example.com"
             />
           </div>
+
           <div className="form-group">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <label htmlFor="password" style={{ marginBottom: 0 }}>Password</label>
+            <div className="label-with-action">
+              <label>Password</label>
               {isLogin && (
                 <button 
                   type="button" 
-                  className="text-btn" 
+                  className="forgot-password-link"
                   onClick={handleResetPassword}
-                  style={{ fontSize: '0.8rem', padding: 0 }}
                 >
                   Forgot Password?
                 </button>
               )}
             </div>
             <input
-              id="password"
               type="password"
               required
               value={password}
@@ -157,13 +149,13 @@ export default function Login() {
           <button 
             type="button" 
             disabled={loading}
-            onClick={handleGoogleLogin} 
+            onClick={handleGoogleClick} 
             style={{
               width: '100%',
               padding: '0.75rem',
               backgroundColor: 'white',
               color: '#1e293b',
-              border: '1px solid #e2e8f0',
+              border: '1px solid #cbd5e1',
               borderRadius: '0.5rem',
               fontWeight: 500,
               display: 'flex',

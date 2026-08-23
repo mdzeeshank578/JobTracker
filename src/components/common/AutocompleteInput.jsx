@@ -27,7 +27,7 @@ export const SUGGESTION_DICTIONARY = {
     'Git', 'GitHub', 'GitLab', 'Bitbucket', 'VS Code', 'IntelliJ IDEA', 'PyCharm', 'Postman', 'Insomnia',
     'Docker Desktop', 'Figma', 'Adobe XD', 'Canva', 'Jira', 'Confluence', 'Trello', 'Notion', 'Slack',
     'Microsoft Teams', 'Zoom', 'Webex', 'Google Workspace', 'AWS Management Console', 'Cloudflare', 'Vercel',
-    'Netlify', 'Supabase', 'Firebase Console', 'Datadog', 'Grafana', 'Prometheus', 'Sentry', 'Mixpanel',
+    'Netlify', 'Supabase', 'PostgreSQL Console', 'Datadog', 'Grafana', 'Prometheus', 'Sentry', 'Mixpanel',
     'Google Analytics', 'Tableau', 'Power BI', 'Excel (Advanced)', 'Zapier', 'Make.com', 'PostgreSQL Admin (pgAdmin)'
   ],
 

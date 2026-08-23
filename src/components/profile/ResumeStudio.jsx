@@ -9,7 +9,9 @@ export default function ResumeStudio() {
   const { currentUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [displayData, setDisplayData] = useState(null);
+  const [isGenerated, setIsGenerated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // 5 Top-Tier ATS Templates: 'jakes' | 'teal' | 'reactive' | 'enhancv' | 'jobscan'
   const [currentTemplate, setCurrentTemplate] = useState('jakes'); 
@@ -19,44 +21,68 @@ export default function ResumeStudio() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [addedJobsMap, setAddedJobsMap] = useState({});
 
+  // Lifecycle Hook: Load authenticated user profile WITHOUT auto-generating resume preview
   useEffect(() => {
     const fetchProfile = async () => {
+      setIsLoading(true);
       try {
-        if (currentUser) {
+        if (currentUser?.uid) {
           const data = await getUserProfile(currentUser.uid);
-          const active = data || {
-            fullName: currentUser.displayName || 'Candidate Profile',
-            email: currentUser.email || '',
-            professionalTitle: 'Software Engineering Professional',
-            bio: 'Experienced developer specializing in full stack web applications and scalable APIs.',
-            technicalSkills: 'JavaScript, React, Node.js, Python, SQL, Cloud Services'
-          };
-          setProfileData(active);
-          setDisplayData(active);
-          if (data?.cvCustomization?.template) {
-            setCurrentTemplate(data.cvCustomization.template);
+          if (data) {
+            setProfileData(data);
+            if (data.cvCustomization?.template) {
+              setCurrentTemplate(data.cvCustomization.template);
+            }
+          } else {
+            setProfileData({
+              fullName: currentUser.displayName || '',
+              email: currentUser.email || ''
+            });
           }
         }
       } catch (err) {
-         console.error("Failed to load profile for resume:", err);
+        console.warn("Failed to load profile for resume:", err.message);
       } finally {
-         setIsLoading(false);
+        setIsLoading(false);
       }
     };
     fetchProfile();
   }, [currentUser]);
 
+  // Explicit User Action: Compile & Generate Resume Document from verified profile data
+  const handleGenerateResume = async () => {
+    setIsGenerating(true);
+    try {
+      let activeProfile = profileData;
+      if (currentUser?.uid) {
+        const freshData = await getUserProfile(currentUser.uid);
+        if (freshData) activeProfile = freshData;
+      }
+
+      const compiledData = activeProfile || {
+        fullName: currentUser?.displayName || 'Candidate Profile',
+        email: currentUser?.email || '',
+        professionalTitle: 'Software Engineering Professional',
+        bio: '',
+        technicalSkills: ''
+      };
+
+      setProfileData(compiledData);
+      setDisplayData(compiledData);
+      setIsGenerated(true);
+    } catch (err) {
+      console.error("Error compiling resume from profile:", err);
+      alert("Failed to compile resume document.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleOptimizeContent = async () => {
-     const activeData = profileData || displayData || {
-       fullName: currentUser?.displayName || 'Candidate Profile',
-       email: currentUser?.email || '',
-       professionalTitle: 'Software Engineering Professional',
-       bio: 'Experienced developer specializing in full stack web applications.',
-       technicalSkills: 'JavaScript, React, Node.js, Python'
-     };
+     if (!displayData) return;
      setIsOptimizing(true);
      try {
-       const optimized = await optimizeResumeContent(activeData);
+       const optimized = await optimizeResumeContent(displayData);
        setDisplayData(optimized);
      } catch(err) {
        console.error("AI Error:", err);
@@ -71,12 +97,12 @@ export default function ResumeStudio() {
   };
 
   const handleAIAnalyze = async () => {
-    const activeData = profileData || displayData || {
+    const activeData = displayData || profileData || {
       fullName: currentUser?.displayName || 'Candidate Profile',
       email: currentUser?.email || '',
       professionalTitle: 'Software Engineering Professional',
-      bio: 'Experienced developer specializing in full stack web applications.',
-      technicalSkills: 'JavaScript, React, Node.js, Python, SQL'
+      bio: '',
+      technicalSkills: ''
     };
 
     setIsAnalyzing(true);
@@ -93,7 +119,6 @@ export default function ResumeStudio() {
   };
 
   const handleSaveJob = async (job, index) => {
-    // Instant optimistic state update
     setAddedJobsMap(prev => ({ ...prev, [index]: true }));
     setAiJobs(prev => prev.map((j, i) => (i === index ? { ...j, added: true } : j)));
 
@@ -104,7 +129,6 @@ export default function ResumeStudio() {
         type: job.type || 'Full-time',
         status: 'Applied',
         dateApplied: new Date().toISOString().split('T')[0],
-        deadline: job.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         notes: `AI Recommended Match! Score: ${job.matchScore}. Reasoning: ${job.reasoning}`,
         resumeUrl: null,
         coverLetterUrl: null
@@ -112,7 +136,6 @@ export default function ResumeStudio() {
     } catch (error) {
        console.error("Failed to save AI job:", error);
        alert("Failed to save AI job.");
-       // Revert state on error
        setAddedJobsMap(prev => ({ ...prev, [index]: false }));
        setAiJobs(prev => prev.map((j, i) => (i === index ? { ...j, added: false } : j)));
     }
@@ -120,74 +143,32 @@ export default function ResumeStudio() {
 
   if (isLoading) return <div style={{padding: '40px', textAlign: 'center'}}>Loading Executive Resume Studio...</div>;
 
-  const fullName = displayData?.fullName || currentUser?.displayName || 'ZEESHAN';
-  const profTitle = displayData?.professionalTitle || 'Full Stack Engineer';
+  // Dynamic Profile Fields Resolvers
+  const fullName = displayData?.fullName || currentUser?.displayName || 'Candidate Name';
+  const profTitle = displayData?.professionalTitle || displayData?.tagline || 'Software Engineering Professional';
   
-  // Universal summary resolver
-  const summaryText = displayData?.summary || displayData?.bio || displayData?.careerObjective || 
-    'Results-driven Full Stack Engineer with experience in building scalable web applications and cloud solutions. Skilled in React, Node.js, JavaScript (ES6+), Python, SQL, Firebase, AWS, and OpenAI API with a focus on P99 latency optimization, clean architecture, and cross-functional Agile leadership.';
+  const summaryText = displayData?.bio || displayData?.careerObjective || displayData?.tagline || '';
   
-  const rawWorkExp = displayData?.workExperience || [];
+  const workExp = displayData?.workExperience || [];
   const projects = displayData?.projects || [];
   const certs = displayData?.certifications || [];
   const schoolingList = displayData?.schoolingList || [];
   const educationList = displayData?.educationList || [];
   const languagesList = displayData?.languagesList || [];
   const hackathons = displayData?.hackathons || [];
-  
-  // Google XYZ Formula ATS work experience fallback
-  const workExp = rawWorkExp.length > 0 
-    ? rawWorkExp 
-    : [
-        {
-          title: 'Full Stack Engineer',
-          company: 'JobTracker Engineering',
-          dates: 'Jan 2022 – Present',
-          location: 'Kolkata, India (Remote)',
-          description: `Engineered responsive full-stack features using React and Node.js, reducing API response latency by 25%.
-Integrated Firebase Authentication and Firestore rules, securing data access for 1,000+ active users.
-Built and maintained CI/CD deployment pipelines on AWS, improving release cycle speeds by 30%.
-Collaborated in an Agile/Scrum team of 6 engineers to ship high-performing SaaS application features.`
-        }
-      ];
 
-  // High-impact ATS projects fallback with 2-3 detailed accomplishment bullets
-  const defaultProjects = projects.length > 0
-    ? projects
-    : [
-        {
-          name: 'Enterprise Job Tracker SaaS',
-          tech: 'React, Node.js, Firebase',
-          description: `Architected full-stack job application tracker with real-time status updates and automated cloud sync.
-Integrated Firebase Auth and Firestore for encrypted user data storage and sub-50ms data retrieval.
-Designed intuitive dashboard UI with metrics charts, status filters, and one-click export.`
-        },
-        {
-          name: 'AI Candidate Matching Engine',
-          tech: 'Python, OpenAI API, AWS',
-          description: `Developed machine learning service in Python using OpenAI GPT-4 API to evaluate candidate-job fit.
-Engineered prompt pipelines extracting technical skills and producing 0-100 match confidence scores.
-Deployed serverless API endpoints on AWS Lambda with automated error handling and logging.`
-        }
-      ];
+  const parseSkillList = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    return val.split(',').map(s => s.trim()).filter(Boolean);
+  };
 
-  const techSkills = displayData?.technicalSkills 
-      ? (Array.isArray(displayData.technicalSkills) ? displayData.technicalSkills : displayData.technicalSkills.split(',').map(s=>s.trim()))
-      : ['JavaScript (ES6+)', 'Python', 'SQL', 'HTML5', 'CSS3'];
+  const techSkills = parseSkillList(displayData?.technicalSkills);
+  const frameworks = parseSkillList(displayData?.frameworks);
+  const tools = parseSkillList(displayData?.tools);
+  const softSkills = parseSkillList(displayData?.softSkills);
 
-  const frameworks = displayData?.frameworks
-      ? (Array.isArray(displayData.frameworks) ? displayData.frameworks : displayData.frameworks.split(',').map(s=>s.trim()))
-      : ['React.js', 'Node.js', 'Express.js', 'TailwindCSS'];
-
-  const tools = displayData?.tools
-      ? (Array.isArray(displayData.tools) ? displayData.tools : displayData.tools.split(',').map(s=>s.trim()))
-      : ['Firebase', 'AWS', 'Git', 'REST APIs', 'OpenAI API', 'Figma'];
-
-  const softSkills = displayData?.softSkills 
-      ? (Array.isArray(displayData.softSkills) ? displayData.softSkills : displayData.softSkills.split(',').map(s=>s.trim()))
-      : ['Agile / Scrum', 'CI/CD Automation', 'System Design', 'Cross-Functional Collaboration'];
-
-  const educationText = displayData?.education || 'Bachelor of Technology (B.Tech) in Electronics & Communication Engineering (ECE)';
+  const educationText = displayData?.education || (educationList.length > 0 ? `${educationList[0].degree || ''} ${educationList[0].school ? '- ' + educationList[0].school : ''}` : '');
   const customFont = displayData?.cvCustomization?.fontStyle || 'Inter';
 
   // =========================================================================
@@ -199,125 +180,130 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
       <div className="jakes-header">
         <h1 className="jakes-name">{fullName}</h1>
         <div className="jakes-contact-line">
-          {displayData?.location || 'Kolkata, India'}
-          <span> | </span>
-          {displayData?.phone || '9051162278'}
-          <span> | </span>
-          {displayData?.email || currentUser?.email || 'mdzeeshank578@gmail.com'}
+          {displayData?.location && <span>{displayData.location}</span>}
+          {displayData?.phone && <><span> | </span><span>{displayData.phone}</span></>}
+          {(displayData?.email || currentUser?.email) && <><span> | </span><span>{displayData?.email || currentUser?.email}</span></>}
           {displayData?.linkedIn && <><span> | </span><span>{displayData.linkedIn.replace('https://', '').replace('www.', '')}</span></>}
           {displayData?.github && <><span> | </span><span>{displayData.github.replace('https://', '').replace('www.', '')}</span></>}
+          {displayData?.portfolio && <><span> | </span><span>{displayData.portfolio.replace('https://', '').replace('www.', '')}</span></>}
         </div>
       </div>
 
       {/* Summary */}
-      <div className="jakes-section">
-        <h2 className="jakes-heading">PROFESSIONAL SUMMARY</h2>
-        <p className="jakes-summary">{summaryText}</p>
-      </div>
+      {summaryText && (
+        <div className="jakes-section">
+          <h2 className="jakes-heading">PROFESSIONAL SUMMARY</h2>
+          <p className="jakes-summary">{summaryText}</p>
+        </div>
+      )}
 
       {/* Education & Schooling */}
-      <div className="jakes-section">
-        <h2 className="jakes-heading">EDUCATION</h2>
-        {educationList.length > 0 ? (
-          educationList.map((edu, i) => (
-            <div key={i} className="jakes-item">
-              <div className="jakes-item-header">
-                <div>
-                  <span className="jakes-bold">{edu.degree}</span>
-                  {edu.school && <span className="jakes-italic"> — {edu.school}</span>}
-                </div>
-                <div className="jakes-right-meta">
-                  {edu.years && <span>{edu.years}</span>}
-                  {edu.score && <span> | {edu.score}</span>}
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="jakes-item-header">
-            <div>
-              <span className="jakes-bold">{educationText}</span>
-              <span className="jakes-italic"> — Maulana Abul Kalam Azad University of Technology</span>
-            </div>
-            <div className="jakes-right-meta">
-              <span>2022 – 2026</span>
-            </div>
-          </div>
-        )}
-
-        {schoolingList.length > 0 && (
-          <div style={{ marginTop: '6px' }}>
-            {schoolingList.map((sch, i) => (
-              <div key={i} className="jakes-item" style={{ marginBottom: '3px' }}>
+      {(educationList.length > 0 || educationText || schoolingList.length > 0) && (
+        <div className="jakes-section">
+          <h2 className="jakes-heading">EDUCATION</h2>
+          {educationList.length > 0 ? (
+            educationList.map((edu, i) => (
+              <div key={i} className="jakes-item">
                 <div className="jakes-item-header">
                   <div>
-                    <span className="jakes-bold">{sch.classGrade || 'Secondary Education'}</span>
-                    {sch.schoolName && <span className="jakes-italic"> — {sch.schoolName}</span>}
-                    {sch.board && <span style={{ fontSize: '0.84rem', color: '#333' }}> ({sch.board})</span>}
+                    <span className="jakes-bold">{edu.degree || 'Degree Program'}</span>
+                    {edu.school && <span className="jakes-italic"> — {edu.school}</span>}
                   </div>
                   <div className="jakes-right-meta">
-                    {sch.year && <span>{sch.year}</span>}
-                    {sch.percentage && <span> | {sch.percentage}</span>}
+                    {edu.years && <span>{edu.years}</span>}
+                    {edu.score && <span> | {edu.score}</span>}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            ))
+          ) : educationText ? (
+            <div className="jakes-item-header">
+              <div>
+                <span className="jakes-bold">{educationText}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {schoolingList.length > 0 && (
+            <div style={{ marginTop: '6px' }}>
+              {schoolingList.map((sch, i) => (
+                <div key={i} className="jakes-item" style={{ marginBottom: '3px' }}>
+                  <div className="jakes-item-header">
+                    <div>
+                      <span className="jakes-bold">{sch.classGrade || 'School Record'}</span>
+                      {sch.schoolName && <span className="jakes-italic"> — {sch.schoolName}</span>}
+                      {sch.board && <span style={{ fontSize: '0.84rem', color: '#333' }}> ({sch.board})</span>}
+                    </div>
+                    <div className="jakes-right-meta">
+                      {sch.year && <span>{sch.year}</span>}
+                      {sch.percentage && <span> | {sch.percentage}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Experience */}
       <div className="jakes-section">
         <h2 className="jakes-heading">PROFESSIONAL EXPERIENCE</h2>
-        {workExp.map((exp, idx) => (
-          <div key={idx} className="jakes-item">
-            <div className="jakes-item-header">
-              <div>
-                <span className="jakes-bold">{exp.title || 'Full Stack Engineer'}</span>
-                <span className="jakes-italic"> — {exp.company || 'JobTracker Engineering'}</span>
-                {exp.location && <span style={{ fontSize: '0.84rem', color: '#475569' }}> ({exp.location})</span>}
+        {workExp.length > 0 ? (
+          workExp.map((exp, idx) => (
+            <div key={idx} className="jakes-item">
+              <div className="jakes-item-header">
+                <div>
+                  <span className="jakes-bold">{exp.title || 'Role'}</span>
+                  {exp.company && <span className="jakes-italic"> — {exp.company}</span>}
+                  {exp.location && <span style={{ fontSize: '0.84rem', color: '#475569' }}> ({exp.location})</span>}
+                </div>
+                <div className="jakes-right-meta">
+                  <span>{exp.dates || ''}</span>
+                </div>
               </div>
-              <div className="jakes-right-meta">
-                <span>{exp.dates || 'Jan 2022 – Present'}</span>
-              </div>
+              {exp.description && (
+                <ul className="jakes-bullets">
+                  {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {exp.description && (
-              <ul className="jakes-bullets">
-                {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
+          ))
+        ) : (
+          <p className="jakes-empty">No work experience entries listed in profile.</p>
+        )}
       </div>
 
       {/* Projects */}
-      <div className="jakes-section">
-        <h2 className="jakes-heading">FEATURED PROJECTS</h2>
-        {defaultProjects.map((proj, idx) => (
-          <div key={idx} className="jakes-item">
-            <div className="jakes-item-header">
-              <div>
-                <span className="jakes-bold">{proj.name}</span>
-                {proj.tech && <span className="jakes-italic"> ({proj.tech})</span>}
+      {projects.length > 0 && (
+        <div className="jakes-section">
+          <h2 className="jakes-heading">FEATURED PROJECTS</h2>
+          {projects.map((proj, idx) => (
+            <div key={idx} className="jakes-item">
+              <div className="jakes-item-header">
+                <div>
+                  <span className="jakes-bold">{proj.name}</span>
+                  {proj.tech && <span className="jakes-italic"> ({proj.tech})</span>}
+                </div>
+                <div className="jakes-right-meta">
+                  {proj.githubUrl && <a href={proj.githubUrl} target="_blank" rel="noreferrer" className="jakes-link">GitHub</a>}
+                  {proj.githubUrl && proj.liveUrl && <span> | </span>}
+                  {proj.liveUrl && <a href={proj.liveUrl} target="_blank" rel="noreferrer" className="jakes-link">Live Demo</a>}
+                </div>
               </div>
-              <div className="jakes-right-meta">
-                {proj.githubUrl && <a href={proj.githubUrl} target="_blank" rel="noreferrer" className="jakes-link">GitHub</a>}
-                {proj.githubUrl && proj.liveUrl && <span> | </span>}
-                {proj.liveUrl && <a href={proj.liveUrl} target="_blank" rel="noreferrer" className="jakes-link">Live Demo</a>}
-              </div>
+              {proj.description && (
+                <ul className="jakes-bullets">
+                  {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {proj.description && (
-              <ul className="jakes-bullets">
-                {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Hackathons & Competitions */}
       {hackathons.length > 0 && (
@@ -340,18 +326,20 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
       )}
 
       {/* Categorized Technical Skills */}
-      <div className="jakes-section">
-        <h2 className="jakes-heading">TECHNICAL SKILLS & COMPETENCIES</h2>
-        <ul className="jakes-bullets" style={{ marginTop: '4px' }}>
-          <li><span className="jakes-bold">Languages:</span> {techSkills.join(', ')}</li>
-          <li><span className="jakes-bold">Frameworks & Libraries:</span> {frameworks.join(', ')}</li>
-          <li><span className="jakes-bold">Cloud & Tools:</span> {tools.join(', ')}</li>
-          <li><span className="jakes-bold">Engineering Methodologies:</span> {softSkills.join(', ')}</li>
-          {languagesList.length > 0 && (
-            <li><span className="jakes-bold">Languages Spoken:</span> {languagesList.map(l => `${l.language} (${l.proficiency})`).join(', ')}</li>
-          )}
-        </ul>
-      </div>
+      {(techSkills.length > 0 || frameworks.length > 0 || tools.length > 0 || softSkills.length > 0) && (
+        <div className="jakes-section">
+          <h2 className="jakes-heading">TECHNICAL SKILLS & COMPETENCIES</h2>
+          <ul className="jakes-bullets" style={{ marginTop: '4px' }}>
+            {techSkills.length > 0 && <li><span className="jakes-bold">Languages & Core:</span> {techSkills.join(', ')}</li>}
+            {frameworks.length > 0 && <li><span className="jakes-bold">Frameworks & Libraries:</span> {frameworks.join(', ')}</li>}
+            {tools.length > 0 && <li><span className="jakes-bold">Cloud & Tools:</span> {tools.join(', ')}</li>}
+            {softSkills.length > 0 && <li><span className="jakes-bold">Engineering Methodologies:</span> {softSkills.join(', ')}</li>}
+            {languagesList.length > 0 && (
+              <li><span className="jakes-bold">Languages Spoken:</span> {languagesList.map(l => `${l.language} (${l.proficiency})`).join(', ')}</li>
+            )}
+          </ul>
+        </div>
+      )}
 
       {/* Certifications & Awards */}
       {certs.length > 0 && (
@@ -373,65 +361,75 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
         <h1 className="teal-name">{fullName}</h1>
         <div className="teal-title">{profTitle}</div>
         <div className="teal-contact-bar">
-          <span>📧 {displayData?.email || 'mdzeeshank578@gmail.com'}</span>
-          <span>📱 {displayData?.phone || '9051162278'}</span>
-          <span>📍 {displayData?.location || 'Kolkata, India'}</span>
+          {displayData?.email && <span>📧 {displayData.email}</span>}
+          {displayData?.phone && <span>📱 {displayData.phone}</span>}
+          {displayData?.location && <span>📍 {displayData.location}</span>}
         </div>
       </div>
 
-      <div className="teal-section">
-        <h2 className="teal-heading">PROFESSIONAL SUMMARY</h2>
-        <p className="teal-text">{summaryText}</p>
-      </div>
-
-      <div className="teal-section">
-        <h2 className="teal-heading">EDUCATION</h2>
-        <p className="teal-text"><strong>{educationText}</strong> — Maulana Abul Kalam Azad University of Technology (2022 – 2026)</p>
-      </div>
-
-      <div className="teal-section">
-        <h2 className="teal-heading">PROFESSIONAL EXPERIENCE</h2>
-        {workExp.map((exp, idx) => (
-          <div key={idx} className="teal-item">
-            <div className="teal-item-head">
-              <strong>{exp.title || 'Full Stack Engineer'}</strong> — <span className="teal-company">{exp.company || 'JobTracker Engineering'}</span> ({exp.location || 'Remote'})
-              <span className="teal-date">{exp.dates || 'Jan 2022 – Present'}</span>
-            </div>
-            {exp.description && (
-              <ul className="teal-bullets">
-                {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="teal-section">
-        <h2 className="teal-heading">FEATURED PROJECTS</h2>
-        {defaultProjects.map((proj, idx) => (
-          <div key={idx} className="teal-item">
-            <div className="teal-item-head">
-              <strong>{proj.name}</strong> ({proj.tech})
-            </div>
-            {proj.description && (
-              <ul className="teal-bullets">
-                {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="teal-section">
-        <h2 className="teal-heading">TECHNICAL COMPETENCIES</h2>
-        <div className="teal-pills">
-          {techSkills.concat(frameworks).concat(tools).map((s, i) => <span key={i} className="teal-pill">{s}</span>)}
+      {summaryText && (
+        <div className="teal-section">
+          <h2 className="teal-heading">PROFESSIONAL SUMMARY</h2>
+          <p className="teal-text">{summaryText}</p>
         </div>
-      </div>
+      )}
+
+      {educationText && (
+        <div className="teal-section">
+          <h2 className="teal-heading">EDUCATION</h2>
+          <p className="teal-text"><strong>{educationText}</strong></p>
+        </div>
+      )}
+
+      {workExp.length > 0 && (
+        <div className="teal-section">
+          <h2 className="teal-heading">PROFESSIONAL EXPERIENCE</h2>
+          {workExp.map((exp, idx) => (
+            <div key={idx} className="teal-item">
+              <div className="teal-item-head">
+                <strong>{exp.title || 'Role'}</strong> — <span className="teal-company">{exp.company || ''}</span> ({exp.location || 'Remote'})
+                <span className="teal-date">{exp.dates || ''}</span>
+              </div>
+              {exp.description && (
+                <ul className="teal-bullets">
+                  {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {projects.length > 0 && (
+        <div className="teal-section">
+          <h2 className="teal-heading">FEATURED PROJECTS</h2>
+          {projects.map((proj, idx) => (
+            <div key={idx} className="teal-item">
+              <div className="teal-item-head">
+                <strong>{proj.name}</strong> ({proj.tech})
+              </div>
+              {proj.description && (
+                <ul className="teal-bullets">
+                  {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(techSkills.length > 0 || frameworks.length > 0 || tools.length > 0) && (
+        <div className="teal-section">
+          <h2 className="teal-heading">TECHNICAL COMPETENCIES</h2>
+          <div className="teal-pills">
+            {techSkills.concat(frameworks).concat(tools).map((s, i) => <span key={i} className="teal-pill">{s}</span>)}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -443,63 +441,72 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
 
         <div className="reactive-side-section">
           <h3>CONTACT</h3>
-          <div>{displayData?.email || 'mdzeeshank578@gmail.com'}</div>
-          <div>{displayData?.phone || '9051162278'}</div>
-          <div>{displayData?.location || 'Kolkata, India'}</div>
+          {displayData?.email && <div>{displayData.email}</div>}
+          {displayData?.phone && <div>{displayData.phone}</div>}
+          {displayData?.location && <div>{displayData.location}</div>}
         </div>
 
-        <div className="reactive-side-section">
-          <h3>TECHNICAL SKILLS</h3>
-          {techSkills.concat(frameworks).map((s, i) => <div key={i} className="reactive-skill-tag">• {s}</div>)}
-        </div>
+        {techSkills.length > 0 && (
+          <div className="reactive-side-section">
+            <h3>TECHNICAL SKILLS</h3>
+            {techSkills.concat(frameworks).map((s, i) => <div key={i} className="reactive-skill-tag">• {s}</div>)}
+          </div>
+        )}
 
-        <div className="reactive-side-section">
-          <h3>EDUCATION</h3>
-          <div>{educationText}</div>
-          <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>2022 – 2026</div>
-        </div>
+        {educationText && (
+          <div className="reactive-side-section">
+            <h3>EDUCATION</h3>
+            <div>{educationText}</div>
+          </div>
+        )}
       </div>
 
       <div className="reactive-main">
-        <div className="reactive-main-section">
-          <h2>SUMMARY</h2>
-          <p>{summaryText}</p>
-        </div>
+        {summaryText && (
+          <div className="reactive-main-section">
+            <h2>SUMMARY</h2>
+            <p>{summaryText}</p>
+          </div>
+        )}
 
-        <div className="reactive-main-section">
-          <h2>PROFESSIONAL EXPERIENCE</h2>
-          {workExp.map((exp, idx) => (
-            <div key={idx} className="reactive-exp-item">
-              <div className="reactive-exp-header">
-                <strong>{exp.title || 'Full Stack Engineer'}</strong> — {exp.company || 'JobTracker Engineering'}
-                <span className="reactive-date">{exp.dates || 'Jan 2022 – Present'}</span>
+        {workExp.length > 0 && (
+          <div className="reactive-main-section">
+            <h2>PROFESSIONAL EXPERIENCE</h2>
+            {workExp.map((exp, idx) => (
+              <div key={idx} className="reactive-exp-item">
+                <div className="reactive-exp-header">
+                  <strong>{exp.title || 'Role'}</strong> — {exp.company || ''}
+                  <span className="reactive-date">{exp.dates || ''}</span>
+                </div>
+                {exp.description && (
+                  <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px', fontSize: '0.84rem' }}>
+                    {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                      <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              {exp.description && (
-                <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px', fontSize: '0.84rem' }}>
-                  {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        <div className="reactive-main-section">
-          <h2>FEATURED PROJECTS</h2>
-          {defaultProjects.map((proj, idx) => (
-            <div key={idx} className="reactive-exp-item">
-              <strong>{proj.name}</strong> ({proj.tech})
-              {proj.description && (
-                <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px', fontSize: '0.84rem' }}>
-                  {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+        {projects.length > 0 && (
+          <div className="reactive-main-section">
+            <h2>FEATURED PROJECTS</h2>
+            {projects.map((proj, idx) => (
+              <div key={idx} className="reactive-exp-item">
+                <strong>{proj.name}</strong> ({proj.tech})
+                {proj.description && (
+                  <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px', fontSize: '0.84rem' }}>
+                    {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                      <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -509,54 +516,62 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
       <div className="enhancv-header">
         <h1>{fullName}</h1>
         <h2>{profTitle}</h2>
-        <p className="enhancv-contact">{displayData?.email || 'mdzeeshank578@gmail.com'} | {displayData?.phone || '9051162278'} | {displayData?.location || 'Kolkata, India'}</p>
+        <p className="enhancv-contact">{displayData?.email} {displayData?.phone ? '| ' + displayData.phone : ''} {displayData?.location ? '| ' + displayData.location : ''}</p>
       </div>
 
-      <div className="enhancv-section">
-        <h3>CAREER SUMMARY</h3>
-        <p>{summaryText}</p>
-      </div>
+      {summaryText && (
+        <div className="enhancv-section">
+          <h3>CAREER SUMMARY</h3>
+          <p>{summaryText}</p>
+        </div>
+      )}
 
-      <div className="enhancv-section">
-        <h3>EDUCATION</h3>
-        <p><strong>{educationText}</strong> — Maulana Abul Kalam Azad University of Technology (2022 – 2026)</p>
-      </div>
+      {educationText && (
+        <div className="enhancv-section">
+          <h3>EDUCATION</h3>
+          <p><strong>{educationText}</strong></p>
+        </div>
+      )}
 
-      <div className="enhancv-section">
-        <h3>EXPERIENCE</h3>
-        {workExp.map((exp, idx) => (
-          <div key={idx} className="enhancv-item">
-            <div className="enhancv-row">
-              <strong>{exp.title || 'Full Stack Engineer'} — {exp.company || 'JobTracker Engineering'}</strong>
-              <span>{exp.dates || 'Jan 2022 – Present'}</span>
+      {workExp.length > 0 && (
+        <div className="enhancv-section">
+          <h3>EXPERIENCE</h3>
+          {workExp.map((exp, idx) => (
+            <div key={idx} className="enhancv-item">
+              <div className="enhancv-row">
+                <strong>{exp.title || 'Role'} — {exp.company || ''}</strong>
+                <span>{exp.dates || ''}</span>
+              </div>
+              <div className="enhancv-sub">{exp.location || ''}</div>
+              {exp.description && (
+                <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
+                  {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <div className="enhancv-sub">{exp.location || 'Kolkata, India (Remote)'}</div>
-            {exp.description && (
-              <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
-                {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <div className="enhancv-section">
-        <h3>FEATURED PROJECTS</h3>
-        {defaultProjects.map((proj, idx) => (
-          <div key={idx} className="enhancv-item">
-            <strong>{proj.name}</strong> ({proj.tech})
-            {proj.description && (
-              <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
-                {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
+      {projects.length > 0 && (
+        <div className="enhancv-section">
+          <h3>FEATURED PROJECTS</h3>
+          {projects.map((proj, idx) => (
+            <div key={idx} className="enhancv-item">
+              <strong>{proj.name}</strong> ({proj.tech})
+              {proj.description && (
+                <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
+                  {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -564,57 +579,67 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
     <div className="jobscan-template">
       <div className="jobscan-header">
         <h1>{fullName}</h1>
-        <p>{displayData?.email || 'mdzeeshank578@gmail.com'} | {displayData?.phone || '9051162278'} | {displayData?.location || 'Kolkata, India'}</p>
+        <p>{displayData?.email} {displayData?.phone ? '| ' + displayData.phone : ''} {displayData?.location ? '| ' + displayData.location : ''}</p>
       </div>
 
-      <div className="jobscan-section">
-        <h2>SUMMARY OF QUALIFICATIONS</h2>
-        <p>{summaryText}</p>
-      </div>
+      {summaryText && (
+        <div className="jobscan-section">
+          <h2>SUMMARY OF QUALIFICATIONS</h2>
+          <p>{summaryText}</p>
+        </div>
+      )}
 
-      <div className="jobscan-section">
-        <h2>EDUCATION</h2>
-        <p><strong>{educationText}</strong> — Maulana Abul Kalam Azad University of Technology (2022 – 2026)</p>
-      </div>
+      {educationText && (
+        <div className="jobscan-section">
+          <h2>EDUCATION</h2>
+          <p><strong>{educationText}</strong></p>
+        </div>
+      )}
 
-      <div className="jobscan-section">
-        <h2>PROFESSIONAL EXPERIENCE</h2>
-        {workExp.map((exp, idx) => (
-          <div key={idx} className="jobscan-item">
-            <h3>{exp.title || 'Full Stack Engineer'} | {exp.company || 'JobTracker Engineering'} — {exp.location || 'Remote'} ({exp.dates || 'Jan 2022 – Present'})</h3>
-            {exp.description && (
-              <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
-                {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
+      {workExp.length > 0 && (
+        <div className="jobscan-section">
+          <h2>PROFESSIONAL EXPERIENCE</h2>
+          {workExp.map((exp, idx) => (
+            <div key={idx} className="jobscan-item">
+              <h3>{exp.title || 'Role'} | {exp.company || ''} — {exp.location || ''} ({exp.dates || ''})</h3>
+              {exp.description && (
+                <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
+                  {exp.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="jobscan-section">
-        <h2>FEATURED PROJECTS</h2>
-        {defaultProjects.map((proj, idx) => (
-          <div key={idx} className="jobscan-item">
-            <h3>{proj.name} ({proj.tech})</h3>
-            {proj.description && (
-              <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
-                {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
-                  <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-      </div>
+      {projects.length > 0 && (
+        <div className="jobscan-section">
+          <h2>FEATURED PROJECTS</h2>
+          {projects.map((proj, idx) => (
+            <div key={idx} className="jobscan-item">
+              <h3>{proj.name} ({proj.tech})</h3>
+              {proj.description && (
+                <ul style={{ paddingLeft: '18px', margin: '4px 0 0 0', fontSize: '0.86rem' }}>
+                  {proj.description.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <li key={i}>{line.replace(/^[-•]\s*/, '')}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="jobscan-section">
-        <h2>TECHNICAL SKILLS & COMPETENCIES</h2>
-        <p><strong>Languages:</strong> {techSkills.join(', ')}</p>
-        <p><strong>Frameworks:</strong> {frameworks.join(', ')}</p>
-        <p><strong>Tools:</strong> {tools.join(', ')}</p>
-      </div>
+      {(techSkills.length > 0 || frameworks.length > 0 || tools.length > 0) && (
+        <div className="jobscan-section">
+          <h2>TECHNICAL SKILLS & COMPETENCIES</h2>
+          {techSkills.length > 0 && <p><strong>Languages:</strong> {techSkills.join(', ')}</p>}
+          {frameworks.length > 0 && <p><strong>Frameworks:</strong> {frameworks.join(', ')}</p>}
+          {tools.length > 0 && <p><strong>Tools:</strong> {tools.join(', ')}</p>}
+        </div>
+      )}
     </div>
   );
 
@@ -642,31 +667,91 @@ Deployed serverless API endpoints on AWS Lambda with automated error handling an
           </div>
           
           <div className="header-controls-right">
-             <button className="optimize-btn" onClick={handleOptimizeContent} disabled={isOptimizing}>
-               {isOptimizing ? <RefreshCw size={15} className="spin-animation" /> : <Sparkles size={15} />} 
-               <span>{isOptimizing ? 'Polishing...' : 'AI Polish'}</span>
-             </button>
-             <button className="download-btn" onClick={handlePrint}>
-               <Download size={15} /> <span>Export PDF</span>
-             </button>
+             {isGenerated ? (
+               <>
+                 <button className="optimize-btn" onClick={handleOptimizeContent} disabled={isOptimizing}>
+                   {isOptimizing ? <RefreshCw size={15} className="spin-animation" /> : <Sparkles size={15} />} 
+                   <span>{isOptimizing ? 'Polishing...' : 'AI Polish'}</span>
+                 </button>
+                 <button className="download-btn" onClick={handlePrint}>
+                   <Download size={15} /> <span>Export PDF</span>
+                 </button>
+               </>
+             ) : (
+               <button 
+                 className="generate-resume-main-btn" 
+                 onClick={handleGenerateResume}
+                 disabled={isGenerating}
+                 style={{ padding: '7px 16px', fontSize: '0.86rem' }}
+               >
+                 {isGenerating ? <RefreshCw size={15} className="spin-animation" /> : <Sparkles size={15} />}
+                 <span>{isGenerating ? 'Compiling...' : 'Generate Resume'}</span>
+               </button>
+             )}
           </div>
         </div>
         
         <div className="resume-canvas-wrapper">
-          <div 
-             className={`resume-document template-${currentTemplate}`}
-             id="resume-document-canvas"
-             style={{ 
-               fontFamily: customFont,
-               transition: 'all 0.3s ease'
-             }}
-          >
-             {currentTemplate === 'jakes' && renderJakesTemplate()}
-             {currentTemplate === 'teal' && renderTealTemplate()}
-             {currentTemplate === 'reactive' && renderReactiveTemplate()}
-             {currentTemplate === 'enhancv' && renderEnhancvTemplate()}
-             {currentTemplate === 'jobscan' && renderJobscanTemplate()}
-          </div>
+          {!isGenerated ? (
+            /* Clean UI State: Idle/Draft Preview State before explicit user generation */
+            <div className="resume-draft-container">
+              <div className="draft-icon-wrapper">
+                <Sparkles size={40} />
+              </div>
+              <h2 className="draft-title">Executive ATS Resume Builder</h2>
+              <p className="draft-subtitle">
+                Your authenticated profile data ({profileData?.fullName || currentUser?.displayName || 'Active Candidate'}) is loaded and ready. Click <strong>Generate Resume</strong> to dynamically compile your ATS-compliant resume document.
+              </p>
+
+              <div className="draft-profile-summary-box">
+                <div className="draft-summary-item">
+                  <span>Candidate Name:</span>
+                  <strong>{profileData?.fullName || currentUser?.displayName || 'Not Set'}</strong>
+                </div>
+                <div className="draft-summary-item">
+                  <span>Title / Headline:</span>
+                  <strong>{profileData?.professionalTitle || profileData?.tagline || 'Software Engineering Professional'}</strong>
+                </div>
+                <div className="draft-summary-item">
+                  <span>Contact Email:</span>
+                  <strong>{profileData?.email || currentUser?.email || 'Not Set'}</strong>
+                </div>
+                <div className="draft-summary-item">
+                  <span>Work Experience Entries:</span>
+                  <strong>{profileData?.workExperience?.length || 0} Roles</strong>
+                </div>
+                <div className="draft-summary-item">
+                  <span>Featured Projects:</span>
+                  <strong>{profileData?.projects?.length || 0} Projects</strong>
+                </div>
+              </div>
+
+              <button 
+                className="generate-resume-main-btn" 
+                onClick={handleGenerateResume}
+                disabled={isGenerating}
+              >
+                {isGenerating ? <RefreshCw size={18} className="spin-animation" /> : <Sparkles size={18} />}
+                <span>{isGenerating ? 'Compiling Profile Data...' : 'Generate Resume'}</span>
+              </button>
+            </div>
+          ) : (
+            /* Generated Resume Canvas bound dynamically to real verified profile data */
+            <div 
+               className={`resume-document template-${currentTemplate}`}
+               id="resume-document-canvas"
+               style={{ 
+                 fontFamily: customFont,
+                 transition: 'all 0.3s ease'
+               }}
+            >
+               {currentTemplate === 'jakes' && renderJakesTemplate()}
+               {currentTemplate === 'teal' && renderTealTemplate()}
+               {currentTemplate === 'reactive' && renderReactiveTemplate()}
+               {currentTemplate === 'enhancv' && renderEnhancvTemplate()}
+               {currentTemplate === 'jobscan' && renderJobscanTemplate()}
+            </div>
+          )}
         </div>
       </div>
 

@@ -547,14 +547,14 @@ To bridge your skill gaps, here are highly-rated online courses:
 Building robust, deployed projects is the best way to stand out. Here are three project ideas with high impact:
 
 1. **Collaborative Kanban Board (Trello Clone):**
-   - *Concepts:* Real-time data syncing (WebSockets or Firebase Firestore), drag-and-drop UI, user authentication.
+   - *Concepts:* Real-time data syncing (WebSockets or PostgreSQL), drag-and-drop UI, user authentication.
    - *Tech:* React, Node.js, Socket.io, MongoDB.
 2. **AI-Powered Semantic Document Search:**
    - *Concepts:* Vector embeddings, RAG (Retrieval-Augmented Generation), file uploading/parsing.
    - *Tech:* Next.js, Python/Node, Pinecone, OpenAI API.
 3. **Personal Job Application Tracker:**
    - *Concepts:* Analytics dashboards (Recharts/Chart.js), deadline reminders, resume versioning.
-   - *Tech:* React, Firebase, Tailwind CSS.`;
+   - *Tech:* React, Express REST API, Tailwind CSS.`;
       suggestions = ["List high-demand skills", "Resume optimization tips", "How to message recruiters"];
     }
     // 9. Messaging Recruiters

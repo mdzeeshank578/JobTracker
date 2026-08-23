@@ -1,321 +1,286 @@
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot,
-  query,
-  orderBy,
-  Timestamp,
-  getDoc,
-  setDoc
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebase";
+const API_BASE_URL = 'http://localhost:5001/api';
 
-export async function uploadDocument(userId, file) {
-  if (!file) return null;
-  const storageRef = ref(storage, `users/${userId}/documents/${Date.now()}_${file.name}`);
-  await uploadBytes(storageRef, file);
-  return await getDownloadURL(storageRef);
+export function clearUserSession(userId) {
+  try {
+    localStorage.removeItem('jobtracker_token');
+    if (userId) {
+      localStorage.removeItem(`jobtracker_token_${userId}`);
+      localStorage.removeItem(`jobtracker_user_profile_${userId}`);
+    }
+  } catch (e) {}
 }
 
-export function getJobsQuery(userId) {
-  if (!userId) return null;
-  const jobsRef = collection(db, "users", userId, "jobs");
-  return query(jobsRef, orderBy("createdAt", "desc"));
+function getAuthHeaders(userId) {
+  const token = localStorage.getItem('jobtracker_token') || (userId ? localStorage.getItem(`jobtracker_token_${userId}`) : null);
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+// Helper to load jobs from local storage per-user
+function getLocalJobs(userId) {
+  const safeUserId = userId || 'guest';
+  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
+  try {
+    const userCached = localStorage.getItem(storageKey);
+    return userCached ? JSON.parse(userCached) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Helper to save jobs to local storage per-user
+function saveLocalJobs(userId, jobs) {
+  const safeUserId = userId || 'guest';
+  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(jobs));
+  } catch (e) {}
+}
+
+function normalizeJobStatus(statusInput) {
+  if (!statusInput) return 'Applied';
+  const s = statusInput.toString().trim().toUpperCase();
+  if (s === 'INTERVIEW' || s === 'INTERVIEWING') return 'Interviewing';
+  if (s === 'OFFER' || s === 'ACCEPTED') return 'Offer';
+  if (s === 'REJECTED') return 'Rejected';
+  if (s === 'WISHLIST') return 'Wishlist';
+  if (s === 'ASSESSMENT') return 'Assessment';
+  return 'Applied';
 }
 
 export function subscribeToJobs(userId, callback) {
   const safeUserId = userId || 'guest';
-  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
-  const globalKey = `jobtracker_global_saved_jobs`;
+  
+  // 1. Immediately return local cached jobs (0ms delay)
+  const initialLocal = getLocalJobs(safeUserId);
+  callback(initialLocal);
 
-  // 1. Immediately return cached jobs from account local storage to prevent data wipe on refresh
-  const loadLocalJobs = () => {
+  // 2. Fetch from Express Backend API using authenticated JWT header
+  let isMounted = true;
+  async function fetchRemoteJobs() {
     try {
-      const userCached = localStorage.getItem(storageKey);
-      const globalCached = localStorage.getItem(globalKey);
-      const userJobs = userCached ? JSON.parse(userCached) : [];
-      const globalJobs = globalCached ? JSON.parse(globalCached) : [];
-
-      // Combine unique jobs by ID or company+role
-      const jobMap = new Map();
-      [...userJobs, ...globalJobs].forEach(j => {
-        if (j && (j.id || (j.company && j.role))) {
-          const key = j.id || `${j.company}_${j.role}`;
-          if (!jobMap.has(key)) {
-            jobMap.set(key, j);
-          }
-        }
+      const res = await fetch(`${API_BASE_URL}/jobs`, {
+        headers: getAuthHeaders(safeUserId)
       });
-      return Array.from(jobMap.values());
-    } catch (e) {
-      return [];
-    }
-  };
+      if (res.ok) {
+        const data = await res.json();
+        const remoteJobs = (data.jobs || []).map(j => ({
+          ...j,
+          id: j._id || j.id,
+          company: j.companyName || j.company,
+          role: j.jobTitle || j.role,
+          companyName: j.companyName || j.company,
+          jobTitle: j.jobTitle || j.role,
+          status: normalizeJobStatus(j.status),
+          createdAt: j.createdAt || j.created_at || new Date().toISOString()
+        }));
 
-  const initialJobs = loadLocalJobs();
-  if (initialJobs.length > 0) {
-    callback(initialJobs);
+        const localJobs = getLocalJobs(safeUserId);
+        const mergedMap = new Map();
+
+        remoteJobs.forEach(j => {
+          if (j.id || j._id) mergedMap.set(j.id || j._id, j);
+        });
+
+        localJobs.forEach(j => {
+          const key = j.id || j._id;
+          if (key && !mergedMap.has(key)) {
+            mergedMap.set(key, j);
+          }
+        });
+
+        const mergedJobs = Array.from(mergedMap.values());
+        saveLocalJobs(safeUserId, mergedJobs);
+        if (isMounted) callback(mergedJobs);
+      }
+    } catch (err) {
+      console.warn("Express backend offline, using local cached jobs:", err.message);
+    }
   }
 
-  if (!userId) return () => {};
+  fetchRemoteJobs();
 
-  const q = getJobsQuery(userId);
-  if (!q) return () => {};
-  
-  return onSnapshot(q, (snapshot) => {
-    const firestoreJobs = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data({ serverTimestamps: 'estimate' })
-    }));
-
-    const combinedMap = new Map();
-    [...firestoreJobs, ...initialJobs].forEach(j => {
-      if (j && (j.id || (j.company && j.role))) {
-        const key = j.id || `${j.company}_${j.role}`;
-        combinedMap.set(key, j);
-      }
-    });
-    const finalJobs = Array.from(combinedMap.values());
-
-    // Cache updated jobs locally per account and globally
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(finalJobs));
-      localStorage.setItem(globalKey, JSON.stringify(finalJobs));
-    } catch (e) {
-      console.error("Error caching jobs:", e);
-    }
-
-    callback(finalJobs);
-  });
+  // Poll server every 10 seconds for sync updates
+  const interval = setInterval(fetchRemoteJobs, 10000);
+  return () => {
+    isMounted = false;
+    clearInterval(interval);
+  };
 }
 
 export async function addJob(userId, jobData) {
   const safeUserId = userId || 'guest';
-  const cleanedJobData = { ...jobData };
-  Object.keys(cleanedJobData).forEach(key => {
-    if (cleanedJobData[key] === undefined) {
-      delete cleanedJobData[key];
-    }
-  });
+  const normStatus = normalizeJobStatus(jobData.status);
+  const tempId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
-  const tempId = `job_${Date.now()}`;
-  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
-  const globalKey = `jobtracker_global_saved_jobs`;
+  const newJob = {
+    _id: jobData._id || jobData.id || tempId,
+    id: jobData._id || jobData.id || tempId,
+    companyName: jobData.companyName || jobData.company || '',
+    jobTitle: jobData.jobTitle || jobData.role || '',
+    company: jobData.companyName || jobData.company || '',
+    role: jobData.jobTitle || jobData.role || '',
+    status: normStatus,
+    appliedDate: jobData.appliedDate || jobData.dateApplied || new Date().toISOString().split('T')[0],
+    dateApplied: jobData.appliedDate || jobData.dateApplied || new Date().toISOString().split('T')[0],
+    deadline: jobData.deadline || null,
+    notes: jobData.notes || '',
+    jobUrl: jobData.jobUrl || jobData.job_url || '',
+    location: jobData.location || '',
+    createdAt: new Date().toISOString()
+  };
 
-  // 1. Optimistically update local account and global cache immediately
+  // 1. Update local storage immediately (optimistic UI update)
+  const existing = getLocalJobs(safeUserId);
+  const updatedJobs = [newJob, ...existing.filter(j => (j._id !== newJob._id && j.id !== newJob.id))];
+  saveLocalJobs(safeUserId, updatedJobs);
+
+  // 2. Post to Express REST API with Bearer token
   try {
-    const newJob = { id: tempId, ...cleanedJobData, userId: safeUserId, createdAt: new Date().toISOString() };
-    
-    const userCached = localStorage.getItem(storageKey);
-    let userJobs = userCached ? JSON.parse(userCached) : [];
-    userJobs = [newJob, ...userJobs.filter(j => j.id !== tempId)];
-    localStorage.setItem(storageKey, JSON.stringify(userJobs));
-
-    const globalCached = localStorage.getItem(globalKey);
-    let globalJobs = globalCached ? JSON.parse(globalCached) : [];
-    globalJobs = [newJob, ...globalJobs.filter(j => j.id !== tempId)];
-    localStorage.setItem(globalKey, JSON.stringify(globalJobs));
-  } catch (e) {}
-
-  if (!userId) return { id: tempId };
-
-  // 2. Perform Firestore write with a 2-second safety timeout guard
-  const jobsRef = collection(db, "users", userId, "jobs");
-  const firestorePromise = addDoc(jobsRef, {
-    ...cleanedJobData,
-    userId,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now()
-  });
-
-  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ id: tempId }), 2000));
-  const docRef = await Promise.race([firestorePromise, timeoutPromise]);
-  return docRef || { id: tempId };
-}
-
-export async function saveJobForLater(userId, jobData) {
-  if (!userId) throw new Error("User ID is required");
-
-  const cleanedJobData = { ...jobData };
-  Object.keys(cleanedJobData).forEach(key => {
-    if (cleanedJobData[key] === undefined) {
-      delete cleanedJobData[key];
+    const res = await fetch(`${API_BASE_URL}/jobs`, {
+      method: 'POST',
+      headers: getAuthHeaders(safeUserId),
+      body: JSON.stringify(newJob)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.job) {
+        const savedJob = {
+          ...data.job,
+          id: data.job._id || data.job.id,
+          _id: data.job._id || data.job.id,
+          company: data.job.companyName || data.job.company || newJob.company,
+          role: data.job.jobTitle || data.job.role || newJob.role,
+          companyName: data.job.companyName || data.job.company || newJob.company,
+          jobTitle: data.job.jobTitle || data.job.role || newJob.role,
+          status: normalizeJobStatus(data.job.status || normStatus)
+        };
+        const syncedJobs = [savedJob, ...updatedJobs.filter(j => j.id !== newJob.id && j._id !== newJob.id && j.id !== savedJob.id)];
+        saveLocalJobs(safeUserId, syncedJobs);
+        return savedJob;
+      }
     }
-  });
+  } catch (err) {
+    console.warn("Could not post job to Express backend, saved locally:", err.message);
+  }
 
-  const savedJobsRef = collection(db, "users", userId, "savedJobs");
-  return await addDoc(savedJobsRef, {
-    ...cleanedJobData,
-    userId,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now()
-  });
+  return newJob;
 }
 
-export function subscribeToSavedJobs(userId, callback) {
-  if (!userId) return () => {};
-  const savedJobsRef = collection(db, "users", userId, "savedJobs");
-  const q = query(savedJobsRef, orderBy("createdAt", "desc"));
-
-  return onSnapshot(q, (snapshot) => {
-    const savedJobs = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data({ serverTimestamps: 'estimate' })
-    }));
-    callback(savedJobs);
-  });
-}
-
-export async function updateJob(userId, jobId, jobData) {
+export async function updateJob(userId, jobId, updates) {
   const safeUserId = userId || 'guest';
-  if (!jobId) throw new Error("Job ID is required");
-
-  const cleanedJobData = { ...jobData };
-  Object.keys(cleanedJobData).forEach(key => {
-    if (cleanedJobData[key] === undefined) {
-      delete cleanedJobData[key];
+  const targetId = typeof jobId === 'object' ? (jobId?._id || jobId?.id) : jobId;
+  const existing = getLocalJobs(safeUserId);
+  const updatedJobs = existing.map(j => {
+    if (j._id === targetId || j.id === targetId || (j.company === updates.company && j.role === updates.role)) {
+      return { 
+        ...j, 
+        ...updates, 
+        ...(updates.status ? { status: normalizeJobStatus(updates.status) } : {}),
+        updatedAt: new Date().toISOString() 
+      };
     }
+    return j;
   });
+  saveLocalJobs(safeUserId, updatedJobs);
 
-  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
-  const globalKey = `jobtracker_global_saved_jobs`;
-
-  // 1. Immediately update local account cache and global cache
   try {
-    const updateList = (cachedStr) => {
-      if (!cachedStr) return [];
-      let jobs = JSON.parse(cachedStr);
-      return jobs.map(j => j.id === jobId ? { ...j, ...cleanedJobData, updatedAt: new Date().toISOString() } : j);
-    };
-
-    localStorage.setItem(storageKey, JSON.stringify(updateList(localStorage.getItem(storageKey))));
-    localStorage.setItem(globalKey, JSON.stringify(updateList(localStorage.getItem(globalKey))));
-  } catch (e) {}
-
-  if (!userId) return true;
-
-  // 2. Perform Firestore update with a 2-second safety timeout guard
-  const jobRef = doc(db, "users", userId, "jobs", jobId);
-  const firestorePromise = updateDoc(jobRef, {
-    ...cleanedJobData,
-    userId,
-    updatedAt: Timestamp.now()
-  });
-
-  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(true), 2000));
-  await Promise.race([firestorePromise, timeoutPromise]);
-  return true;
+    await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(targetId)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(safeUserId),
+      body: JSON.stringify(updates)
+    });
+  } catch (err) {
+    console.warn("Express backend update failed, saved locally:", err.message);
+  }
 }
 
 export async function deleteJob(userId, jobId) {
   const safeUserId = userId || 'guest';
-  if (!jobId) throw new Error("Job ID is required");
+  const targetId = typeof jobId === 'object' ? (jobId?._id || jobId?.id) : jobId;
+  if (!targetId) return;
 
-  const storageKey = `jobtracker_user_jobs_${safeUserId}`;
-  const globalKey = `jobtracker_global_saved_jobs`;
+  const existing = getLocalJobs(safeUserId);
+  const updatedJobs = existing.filter(j => j._id !== targetId && j.id !== targetId);
+  saveLocalJobs(safeUserId, updatedJobs);
 
-  // Update local cache and global cache
   try {
-    const filterList = (cachedStr) => {
-      if (!cachedStr) return [];
-      let jobs = JSON.parse(cachedStr);
-      return jobs.filter(j => j.id !== jobId);
-    };
-
-    localStorage.setItem(storageKey, JSON.stringify(filterList(localStorage.getItem(storageKey))));
-    localStorage.setItem(globalKey, JSON.stringify(filterList(localStorage.getItem(globalKey))));
-  } catch (e) {}
-
-  if (!userId) return true;
-
-  const jobRef = doc(db, "users", userId, "jobs", jobId);
-  const result = await deleteDoc(jobRef);
-  return result;
+    await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(targetId)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(safeUserId)
+    });
+  } catch (err) {
+    console.warn("Express backend delete failed, removed locally:", err.message);
+  }
 }
 
 export async function getUserProfile(userId) {
-  if (!userId) return null;
-
+  const safeUserId = userId || 'guest';
+  const storageKey = `jobtracker_user_profile_${safeUserId}`;
   try {
-    const profileRef = doc(db, "users", userId, "profile", "info");
-    const docSnap = await getDoc(profileRef);
-    if (docSnap.exists()) {
-      const cloudData = docSnap.data();
-      // Sync cloud data to local account storage
-      localStorage.setItem(`jobtracker_user_profile_${userId}`, JSON.stringify(cloudData));
-
-      // Also sync resume text if present
-      if (cloudData.bio || cloudData.technicalSkills || cloudData.fullName) {
-        const textSummary = [
-          cloudData.fullName,
-          cloudData.professionalTitle,
-          cloudData.bio,
-          cloudData.technicalSkills,
-          cloudData.frameworks,
-          cloudData.tools,
-          Array.isArray(cloudData.workExperience) ? cloudData.workExperience.map(w => `${w.title} at ${w.company}: ${w.description}`).join('; ') : '',
-          Array.isArray(cloudData.projects) ? cloudData.projects.map(p => `${p.name}: ${p.description}`).join('; ') : ''
-        ].filter(Boolean).join('\n');
-        localStorage.setItem('jobTracker_resumeText', textSummary);
+    const res = await fetch(`${API_BASE_URL}/profile`, {
+      headers: getAuthHeaders(safeUserId)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.profile) {
+        localStorage.setItem(storageKey, JSON.stringify(data.profile));
+        return data.profile;
       }
-
-      return cloudData;
     }
-  } catch (err) {
-    console.warn("Firestore getUserProfile network warning, falling back to account storage:", err.message);
+  } catch (e) {
+    console.warn("Express backend profile fetch failed, using cache:", e.message);
   }
 
-  // Fallback to local storage for this specific account ID
-  const localSaved = localStorage.getItem(`jobtracker_user_profile_${userId}`);
-  if (localSaved) {
-    try {
-      return JSON.parse(localSaved);
-    } catch (e) {}
-  }
-
-  return null;
+  const cached = localStorage.getItem(storageKey);
+  return cached ? JSON.parse(cached) : null;
 }
 
 export async function updateUserProfile(userId, profileData) {
-  if (!userId) throw new Error("User ID is required");
-  
-  const cleanedData = { ...profileData };
-  Object.keys(cleanedData).forEach(key => {
-    if (cleanedData[key] === undefined) {
-      delete cleanedData[key];
-    }
-  });
+  const safeUserId = userId || 'guest';
+  const storageKey = `jobtracker_user_profile_${safeUserId}`;
 
-  // 1. Instant account local persistence
-  localStorage.setItem(`jobtracker_user_profile_${userId}`, JSON.stringify(cleanedData));
+  // Strip client-side userId payload before sending
+  const payload = { ...profileData };
+  delete payload.userId;
+  delete payload.user_id;
 
-  // Sync resume text globally
-  const textSummary = [
-    cleanedData.fullName,
-    cleanedData.professionalTitle,
-    cleanedData.bio,
-    cleanedData.technicalSkills,
-    cleanedData.frameworks,
-    cleanedData.tools,
-    Array.isArray(cleanedData.workExperience) ? cleanedData.workExperience.map(w => `${w.title} at ${w.company}: ${w.description}`).join('; ') : '',
-    Array.isArray(cleanedData.projects) ? cleanedData.projects.map(p => `${p.name}: ${p.description}`).join('; ') : ''
-  ].filter(Boolean).join('\n');
-  localStorage.setItem('jobTracker_resumeText', textSummary);
+  // Optimistic update to localStorage
+  localStorage.setItem(storageKey, JSON.stringify({ userId: safeUserId, ...profileData }));
 
-  // 2. Cloud sync with Firestore
   try {
-    const profileRef = doc(db, "users", userId, "profile", "info");
-    await setDoc(profileRef, {
-      ...cleanedData,
-      updatedAt: Timestamp.now()
-    }, { merge: true });
+    const res = await fetch(`${API_BASE_URL}/profile`, {
+      method: 'POST',
+      headers: getAuthHeaders(safeUserId),
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.profile) {
+        localStorage.setItem(storageKey, JSON.stringify(data.profile));
+        return data.profile;
+      }
+    }
   } catch (err) {
-    console.warn("Firestore cloud sync notice:", err.message);
+    console.warn("Express backend profile update failed, saved locally:", err.message);
   }
+  return { userId: safeUserId, ...profileData };
+}
 
-  return cleanedData;
+export async function saveJobForLater(userId, jobData) {
+  return await addJob(userId, { ...jobData, status: 'WISHLIST' });
+}
+
+export async function uploadDocument(userId, file) {
+  if (!file) return null;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+  });
 }

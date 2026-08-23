@@ -33,6 +33,21 @@ export default function Navbar({ onAddApplication, onOpenProfile }) {
     }
   };
 
+  const userGreeting = (() => {
+    if (!currentUser) return '';
+    if (currentUser.displayName && currentUser.displayName !== 'Active Candidate' && currentUser.displayName !== 'Google User') {
+      return currentUser.displayName;
+    }
+    const email = currentUser.email || '';
+    const handle = email.split('@')[0].toLowerCase();
+    if (handle === 'mdzeeshan578') return 'MD ZEESHAN KHAN';
+    if (handle === 'mdzeeshan457') return 'Md Zeeshan Khan';
+    if (handle) {
+      return handle.replace(/[\._]/g, ' ').replace(/[0-9]/g, '').trim().replace(/\b\w/g, c => c.toUpperCase());
+    }
+    return email;
+  })();
+
   return (
     <nav className="navbar">
       <div className="navbar-left">
@@ -48,7 +63,7 @@ export default function Navbar({ onAddApplication, onOpenProfile }) {
       <div className="navbar-right">
         {currentUser ? (
           <>
-            <span className="user-greeting">Hi, {currentUser.displayName || currentUser.email}</span>
+            <span className="user-greeting">Hi, {userGreeting}</span>
             {completion && (
               <button
                 className="profile-completion-badge"

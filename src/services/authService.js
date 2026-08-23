@@ -9,11 +9,15 @@ export async function registerAccount(email, password, displayName) {
     });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to register account.');
+      throw new Error(data.message || data.error || 'Failed to register account.');
     }
-    return data.user;
+    const payload = data.data || data;
+    return {
+      user: payload.user || payload,
+      token: payload.token || data.token
+    };
   } catch (err) {
-    console.warn("Backend register service error, using local fallback:", err.message);
+    console.warn("Backend register service error:", err.message);
     throw err;
   }
 }
@@ -27,11 +31,15 @@ export async function loginAccount(email, password) {
     });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || 'Invalid email or password.');
+      throw new Error(data.message || data.error || 'Invalid email or password.');
     }
-    return data.user;
+    const payload = data.data || data;
+    return {
+      user: payload.user || payload,
+      token: payload.token || data.token
+    };
   } catch (err) {
-    console.warn("Backend login service error, using local fallback:", err.message);
+    console.warn("Backend login service error:", err.message);
     throw err;
   }
 }
@@ -44,16 +52,23 @@ export async function loginWithGoogleBackend(email, displayName, photoURL) {
       body: JSON.stringify({ email, displayName, photoURL })
     });
     const data = await res.json();
-    if (res.ok && data.user) {
-      return data.user;
+    const payload = data.data || data;
+    if (res.ok && (payload.user || data.user)) {
+      return {
+        user: payload.user || data.user,
+        token: payload.token || data.token
+      };
     }
   } catch (err) {
     console.warn("Backend Google login error:", err.message);
   }
   return {
-    uid: "google_user_777",
-    email: email || "user.google@gmail.com",
-    displayName: displayName || "Google User",
-    photoURL: photoURL || null
+    user: {
+      uid: "google_user_777",
+      email: email || "user.google@gmail.com",
+      displayName: displayName || "Google User",
+      photoURL: photoURL || null
+    },
+    token: null
   };
 }

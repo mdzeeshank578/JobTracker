@@ -646,6 +646,106 @@
   to { transform: rotate(360deg); }
 }
 
+/* ==========================================================================
+   DRAFT / IDLE STATE PREVIEW STYLES
+   ========================================================================== */
+.resume-draft-container {
+  background: #ffffff;
+  width: 100%;
+  max-width: 800px;
+  min-height: 550px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  padding: 48px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-radius;
+  border: 1px dashed #cbd5e1;
+  margin: auto;
+}
+
+.draft-icon-wrapper {
+  width: 80px;
+  height: 80px;
+  background: #eff6ff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563eb;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
+}
+
+.draft-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 10px 0;
+}
+
+.draft-subtitle {
+  font-size: 0.95rem;
+  color: #64748b;
+  max-width: 540px;
+  line-height: 1.5;
+  margin: 0 0 28px 0;
+}
+
+.draft-profile-summary-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 24px;
+  width: 100%;
+  max-width: 540px;
+  margin-bottom: 32px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.draft-summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.draft-summary-item strong {
+  color: #0f172a;
+}
+
+.generate-resume-main-btn {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s;
+}
+
+.generate-resume-main-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+.generate-resume-main-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 @page {
   margin: 0;
   size: auto;

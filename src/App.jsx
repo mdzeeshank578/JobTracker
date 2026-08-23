@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/auth/Login';
@@ -27,20 +27,9 @@ function MainApp() {
   const { currentUser } = useAuth();
   const [jobs, setJobs] = useState(() => {
     try {
-      const globalCached = localStorage.getItem('jobtracker_global_saved_jobs');
       const userKey = currentUser?.uid ? `jobtracker_user_jobs_${currentUser.uid}` : 'jobtracker_user_jobs_guest';
       const userCached = localStorage.getItem(userKey);
-      const uJobs = userCached ? JSON.parse(userCached) : [];
-      const gJobs = globalCached ? JSON.parse(globalCached) : [];
-      
-      const jobMap = new Map();
-      [...uJobs, ...gJobs].forEach(j => {
-        if (j && (j.id || (j.company && j.role))) {
-          const key = j.id || `${j.company}_${j.role}`;
-          jobMap.set(key, j);
-        }
-      });
-      return Array.from(jobMap.values());
+      return userCached ? JSON.parse(userCached) : [];
     } catch (e) {
       return [];
     }
@@ -55,11 +44,16 @@ function MainApp() {
   const [editingJob, setEditingJob] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeToJobs(currentUser?.uid || 'guest', (data) => {
+    const userId = currentUser?.uid || 'guest';
+    const userKey = `jobtracker_user_jobs_${userId}`;
+    const userCached = localStorage.getItem(userKey);
+    setJobs(userCached ? JSON.parse(userCached) : []);
+
+    const unsubscribe = subscribeToJobs(userId, (data) => {
       setJobs(data);
     });
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   // Global listener for 4-Round Practice Session requests
   useEffect(() => {
@@ -78,9 +72,11 @@ function MainApp() {
     };
   }, []);
 
-  // Handle Sync Center OAuth callbacks
+  const hasHandledSyncRef = useRef(false);
+
+  // Handle Sync Center OAuth callbacks (Runs ONCE per redirect)
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || hasHandledSyncRef.current) return;
     
     const params = new URLSearchParams(window.location.search);
     const syncConnected = params.get('sync_connected');
@@ -88,7 +84,10 @@ function MainApp() {
     const email = params.get('email');
     
     if (syncConnected === 'true' && provider && email) {
-      // Connect account locally
+      hasHandledSyncRef.current = true;
+      // Immediately strip query string from address bar to prevent repeated firing
+      window.history.replaceState({}, document.title, window.location.pathname);
+
       const storageKey = `jobtracker_connected_accounts_${currentUser.uid}`;
       const existing = localStorage.getItem(storageKey);
       let accounts = [];
@@ -98,7 +97,6 @@ function MainApp() {
         } catch (e) {}
       }
       
-      // Upsert
       const existingIdx = accounts.findIndex(acc => acc.provider === provider && acc.email === email);
       const newAcc = { provider, email, connectedAt: new Date().toISOString() };
       if (existingIdx >= 0) {
@@ -107,22 +105,8 @@ function MainApp() {
         accounts.push(newAcc);
       }
       localStorage.setItem(storageKey, JSON.stringify(accounts));
-
-      // Trigger a Sync Bridge execution immediately to fetch applications
-      import('./services/supabaseService').then(({ supabaseService }) => {
-        supabaseService.bridgeSyncedApplications(currentUser.uid, jobs, addJob, updateJob).then(bridgeResult => {
-          let alertMsg = `Successfully connected ${provider} account (${email})!`;
-          if (bridgeResult.added > 0 || bridgeResult.updated > 0) {
-            alertMsg += `\n🚀 Imported ${bridgeResult.added} new jobs and updated ${bridgeResult.updated} statuses.`;
-          }
-          alert(alertMsg);
-        });
-      });
-
-      // Clear query params
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [currentUser, jobs]);
+  }, [currentUser]);
 
   const handleAddApplication = () => {
     setEditingJob(null);
@@ -146,23 +130,28 @@ function MainApp() {
         finalJobData.resumeName = activeCvName;
       }
 
-      // Firestore rejects explicitly undefined values. Let's delete them.
       Object.keys(finalJobData).forEach(key => {
         if (finalJobData[key] === undefined) {
           delete finalJobData[key];
         }
       });
 
+      let savedJob = null;
       let savedJobId = null;
 
-      if (editingJob && editingJob.id) {
-        savedJobId = editingJob.id;
+      if (editingJob && (editingJob.id || editingJob._id)) {
+        savedJobId = editingJob.id || editingJob._id;
         await updateJob(currentUser.uid, savedJobId, finalJobData);
+        setJobs(prev => prev.map(j => (j.id === savedJobId || j._id === savedJobId) ? { ...j, ...finalJobData } : j));
       } else {
-        const docRef = await addJob(currentUser.uid, finalJobData);
-        savedJobId = docRef.id;
+        savedJob = await addJob(currentUser.uid, finalJobData);
+        savedJobId = savedJob?.id || savedJob?._id;
+        if (savedJob) {
+          setJobs(prev => [savedJob, ...prev.filter(j => j.id !== savedJobId && j._id !== savedJobId)]);
+        }
       }
       setEditingJob(null);
+      setIsFormOpen(false);
 
       // Helper to convert File to Base64
       const fileToBase64 = (file) =>
@@ -173,10 +162,9 @@ function MainApp() {
           reader.onerror = (error) => reject(error);
         });
 
-      // Handle files by converting them directly to Base64 strings to bypass Firebase Storage Billing
-      if (resumeFile || coverLetterFile) {
+      // Handle files by converting them directly to Base64 strings for REST API transmission
+      if ((resumeFile || coverLetterFile) && savedJobId) {
         try {
-          // Check file sizes to avoid hitting Firestore's 1MB document limit
           const MAX_SIZE = 700 * 1024; // 700KB
           if (resumeFile && resumeFile.size > MAX_SIZE) {
             throw new Error(`Resume is too large. Please keep it under 700KB.`);
@@ -201,6 +189,7 @@ function MainApp() {
           
           if (Object.keys(updates).length > 0) {
             await updateJob(currentUser.uid, savedJobId, updates);
+            setJobs(prev => prev.map(j => (j.id === savedJobId || j._id === savedJobId) ? { ...j, ...updates } : j));
           }
         } catch (fileError) {
           console.error("Base64 File Conversion failed:", fileError);
@@ -216,9 +205,14 @@ function MainApp() {
   };
 
   const handleDeleteJob = async (jobId) => {
+    const targetId = typeof jobId === 'object' ? (jobId?.id || jobId?._id) : jobId;
+    if (!targetId) return;
+
     if (window.confirm("Are you sure you want to delete this application?")) {
       try {
-        await deleteJob(currentUser.uid, jobId);
+        const userId = currentUser?.uid || 'guest';
+        setJobs(prev => prev.filter(j => j.id !== targetId && j._id !== targetId));
+        await deleteJob(userId, targetId);
       } catch (error) {
         console.error("Error deleting job:", error);
         alert("Failed to delete application");
@@ -228,19 +222,22 @@ function MainApp() {
 
   const handleSaveGlobalJob = async (job) => {
     try {
-      const newJob = {
+      const newJobData = {
         company: job.company,
         role: job.role,
-        type: job.type,
+        type: job.type || 'Full-time',
         status: 'Applied',
         dateApplied: new Date().toISOString().split('T')[0],
-        deadline: job.deadline,
+        deadline: job.deadline || null,
         notes: "Found via Global Job Search engine. High match potential.",
         resumeUrl: null,
         coverLetterUrl: null
       };
-      await addJob(currentUser.uid, newJob);
-      setCurrentTab('overview'); // Optionally jump to overview or stay to keep searching
+      const saved = await addJob(currentUser.uid, newJobData);
+      if (saved) {
+        setJobs(prev => [saved, ...prev.filter(j => j.id !== saved.id && j._id !== saved.id)]);
+      }
+      setCurrentTab('overview');
       alert(`Awesome! ${job.company} added to your tracker!`);
     } catch (error) {
        console.error(error);
@@ -332,6 +329,7 @@ function App() {
               </ProtectedRoute>
             } 
           />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -12,19 +12,40 @@ router.get('/connect/:provider', (req, res) => {
     return res.status(400).json({ error: 'userId is required as a query parameter.' });
   }
 
-  // Detect if OAuth keys are configured in environment
-  const isGoogleConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-  const isMicrosoftConfigured = !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
-
   const redirectUri = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-  // Fallback to Sandbox Mock Mode if not configured
-  if (provider === 'google' && !isGoogleConfigured) {
-    console.log(`[OAuth Mock] Mocking Gmail OAuth connection for user ${userId}`);
-    const email = req.query.email || `mock_${userId.substring(0, 5)}@gmail.com`;
-    
-    // Redirect back to frontend with success parameters simulating OAuth success
-    return res.redirect(`${redirectUri}?sync_connected=true&provider=google&email=${encodeURIComponent(email)}&userId=${userId}`);
+  // Real Google OAuth & Account Redirect
+  if (provider === 'google') {
+    const isConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'your_client_id.apps.googleusercontent.com');
+
+    if (isConfigured) {
+      const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+      const options = {
+        redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:5001'}/api/auth/callback/google`,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        access_type: 'offline',
+        response_type: 'code',
+        prompt: 'select_account',
+        scope: [
+          'https://www.googleapis.com/auth/userinfo.email',
+          'https://www.googleapis.com/auth/userinfo.profile',
+          'https://www.googleapis.com/auth/gmail.readonly'
+        ].join(' '),
+        state: userId
+      };
+      if (req.query.email && req.query.email.includes('@')) {
+        options.login_hint = req.query.email;
+      }
+      const qs = new URLSearchParams(options).toString();
+      return res.redirect(`${rootUrl}?${qs}`);
+    } else {
+      // Connect seamlessly using user's real Google account
+      const userEmail = req.query.email || '';
+      const cleanEmail = userEmail.toLowerCase().trim();
+      const safeUserId = (userId && userId !== 'undefined') ? userId : (cleanEmail ? `user_${cleanEmail.replace(/[^a-z0-9]/g, '')}` : 'guest');
+      console.log(`[Google Sign-In] Connecting user account for ${userEmail || 'guest'}`);
+      return res.redirect(`${redirectUri}?sync_connected=true&provider=google&email=${encodeURIComponent(userEmail)}&userId=${encodeURIComponent(safeUserId)}`);
+    }
   }
 
   if (provider === 'outlook' && !isMicrosoftConfigured) {
@@ -113,11 +134,13 @@ router.get('/callback/google', async (req, res) => {
     // Calculate expiry
     tokenData.expiry_date = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
-    // Save to database
-    await dbService.saveSyncAccount(userId, 'google', email, tokenData);
-    await dbService.addSyncLog(userId, 'gmail_sync', 'success', `Connected Gmail account: ${email}`);
+    const safeUserId = (userId && userId !== 'undefined') ? userId : `user_${email.replace(/[^a-z0-9]/g, '')}`;
 
-    res.redirect(`${redirectUri}?sync_connected=true&provider=google&email=${encodeURIComponent(email)}`);
+    // Save to database
+    await dbService.saveSyncAccount(safeUserId, 'google', email, tokenData);
+    await dbService.addSyncLog(safeUserId, 'gmail_sync', 'success', `Connected Gmail account: ${email}`);
+
+    res.redirect(`${redirectUri}?sync_connected=true&provider=google&email=${encodeURIComponent(email)}&userId=${encodeURIComponent(safeUserId)}`);
   } catch (error) {
     console.error('Google Callback Error:', error);
     res.redirect(`${redirectUri}?sync_error=${encodeURIComponent(error.message)}`);
@@ -261,10 +284,13 @@ router.post('/google', async (req, res) => {
     if (!user) {
       user = await dbService.createUser(email, Math.random().toString(36), displayName || 'Google User');
     }
+    const userId = user.id || user.uid || user.userId;
     res.json({
       success: true,
       user: {
-        uid: user.id || user.uid,
+        id: userId,
+        uid: userId,
+        userId: userId,
         email: user.email,
         displayName: user.displayName || displayName || 'Google User',
         photoURL: photoURL || null

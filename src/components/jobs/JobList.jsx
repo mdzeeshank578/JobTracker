@@ -40,11 +40,19 @@ export default function JobList({ jobs, onEdit, onDelete, onSaveGlobal, globalSe
   }, [searchTerm]);
 
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = job.company?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          job.role?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || job.status === filterStatus;
+    const companyStr = job.company || job.companyName || '';
+    const roleStr = job.role || job.jobTitle || '';
+    const matchesSearch = companyStr.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          roleStr.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // As per prompt, we don't naturally have a "type" field yet, but we allow filtering if it existed. 
+    const jobStatusNorm = (job.status || 'Applied').toLowerCase();
+    const filterStatusNorm = filterStatus.toLowerCase();
+
+    const matchesStatus = filterStatus === 'All' || 
+                          jobStatusNorm === filterStatusNorm ||
+                          (filterStatusNorm === 'interview' && (jobStatusNorm === 'interviewing' || jobStatusNorm === 'interview')) ||
+                          (filterStatusNorm === 'applied' && jobStatusNorm === 'applied');
+    
     const jobType = job.type || 'Full-time';
     const matchesType = filterType === 'All' || jobType === filterType;
     

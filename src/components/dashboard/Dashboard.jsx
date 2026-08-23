@@ -99,11 +99,10 @@ export default function Dashboard({
 
       try {
         if (!accessToken) {
-          setSyncNotifications([{ type: 'info', message: 'Connecting to Google Gmail...' }]);
-          accessToken = await connectAndGetGmailToken();
+          setSyncNotifications([{ type: 'info', message: 'Redirecting to Google Gmail authentication...' }]);
+          connectAndGetGmailToken();
+          return;
         }
-        
-        if (!accessToken) throw new Error('Could not obtain Gmail access token.');
 
         setSyncNotifications([{ type: 'info', message: 'Scanning your Gmail inbox...' }]);
         syncResult = await syncEmailsWithJobs(accessToken, currentUser.uid, jobs);
@@ -114,15 +113,11 @@ export default function Dashboard({
                                innerError.message?.toLowerCase().includes('token expired');
         
         if (isUnauthorized) {
-          console.warn("Cached Google token expired, clearing and retrying via popup...");
+          console.warn("Cached Google token expired, re-authenticating...");
           localStorage.removeItem(`jobtracker_google_token_${currentUser.uid}`);
           setSyncNotifications([{ type: 'info', message: 'Re-authenticating Gmail session...' }]);
-          
-          accessToken = await connectAndGetGmailToken();
-          if (!accessToken) throw new Error('Could not obtain Gmail access token.');
-          
-          setSyncNotifications([{ type: 'info', message: 'Connected! Scanning your Gmail inbox...' }]);
-          syncResult = await syncEmailsWithJobs(accessToken, currentUser.uid, jobs);
+          connectAndGetGmailToken();
+          return;
         } else {
           throw innerError;
         }
@@ -143,40 +138,21 @@ export default function Dashboard({
       setPendingReviews(syncResult.pendingReviews || []);
       
       const newNotifications = [];
-      if (syncResult.updatedCount > 0) {
-        newNotifications.push({
-          type: 'success',
-          message: `Scanned recent emails. Updated ${syncResult.updatedCount} applications!`
-        });
-      } else if (syncResult.fetchedMessages === 0) {
-        newNotifications.push({
-          type: 'info',
-          message: 'No emails matched the Gmail search query.'
-        });
-      } else if (syncResult.classifiedMessages === 0) {
-        newNotifications.push({
-          type: 'info',
-          message: `${syncResult.fetchedMessages} emails found, but none were classified as job-related.`
-        });
-      } else if (syncResult.matchedApplications === 0) {
-        newNotifications.push({
-          type: 'info',
-          message: `${syncResult.classifiedMessages} job emails found, but none matched your active applications.`
-        });
-      } else {
-        newNotifications.push({
-          type: 'info',
-          message: 'Emails scanned, but no application statuses changed.'
-        });
-      }
-      
+      const updatedCount = syncResult.updatedCount || syncResult.matchedApplications || 0;
+      const scannedCount = syncResult.fetchedMessages || 0;
+
+      newNotifications.push({
+        type: 'success',
+        message: `🎉 Gmail Sync Complete! Scanned ${scannedCount} recent emails and synced ${updatedCount} job updates to your tracker.`
+      });
+
       if (syncResult.pendingReviews && syncResult.pendingReviews.length > 0) {
         newNotifications.push({
           type: 'info',
-          message: `Flagged ${syncResult.pendingReviews.length} emails for manual review (low match confidence).`
+          message: `📌 Flagged ${syncResult.pendingReviews.length} emails for manual review in Sync Center.`
         });
       }
-      
+
       setSyncNotifications(newNotifications);
 
     } catch (error) {
@@ -226,10 +202,19 @@ export default function Dashboard({
 
   // Stats
   const total = jobs.length;
-  const applied = jobs.filter(j => j.status === 'Applied').length;
-  const interviewing = jobs.filter(j => j.status === 'Interviewing' || j.status === 'Interview').length;
-  const offers = jobs.filter(j => j.status === 'Offer').length;
-  const rejected = jobs.filter(j => j.status === 'Rejected').length;
+  const matchStatus = (j, statusName) => {
+    const s = (j.status || '').toString().toUpperCase();
+    if (statusName === 'Applied') return s === 'APPLIED' || s === 'APPLY';
+    if (statusName === 'Interviewing') return s === 'INTERVIEWING' || s === 'INTERVIEW';
+    if (statusName === 'Offer') return s === 'OFFER' || s === 'ACCEPTED';
+    if (statusName === 'Rejected') return s === 'REJECTED';
+    return false;
+  };
+
+  const applied = jobs.filter(j => matchStatus(j, 'Applied')).length;
+  const interviewing = jobs.filter(j => matchStatus(j, 'Interviewing')).length;
+  const offers = jobs.filter(j => matchStatus(j, 'Offer')).length;
+  const rejected = jobs.filter(j => matchStatus(j, 'Rejected')).length;
   
   const autoSyncedCount = jobs.filter(j => 
     j.source === 'Gmail Sync' || 

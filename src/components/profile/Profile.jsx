@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getUserProfile, updateUserProfile } from '../../services/db';
-import { updateProfile } from 'firebase/auth';
 import { AutocompleteInput, AutocompleteTextarea, SUGGESTION_DICTIONARY } from '../common/AutocompleteInput';
 import './Profile.css';
 
@@ -65,8 +64,71 @@ export function calculateProfileCompletion(p) {
   return { percentage: finalScore, level, color, items };
 }
 
+function extractProfileDetailsFromEmail(user) {
+  const email = user?.email || '';
+  const existingName = user?.displayName;
+  
+  if (existingName && existingName !== 'Active Candidate' && existingName !== 'Google User') {
+    const handle = email.split('@')[0] || 'candidate';
+    const cleanHandle = handle.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    return {
+      fullName: existingName,
+      email: email,
+      professionalTitle: 'Software Engineering Professional',
+      tagline: 'Full Stack Engineer | AI & Cloud Systems',
+      linkedIn: `https://linkedin.com/in/${cleanHandle}`,
+      github: `https://github.com/${cleanHandle}`,
+      portfolio: `https://${cleanHandle}.dev`
+    };
+  }
+
+  if (!email || !email.includes('@')) {
+    return {
+      fullName: 'Software Engineering Professional',
+      email: '',
+      professionalTitle: 'Software Engineering Professional',
+      tagline: 'Full Stack Engineer',
+      linkedIn: '',
+      github: '',
+      portfolio: ''
+    };
+  }
+
+  const handle = email.split('@')[0].toLowerCase();
+  const cleanHandle = handle.replace(/[^a-z0-9]/gi, '');
+  
+  let fullName = 'Software Engineer';
+  if (handle === 'mdzeeshan578' || handle === 'mdzeeshan') {
+    fullName = 'MD ZEESHAN KHAN';
+  } else if (handle === 'mdzeeshan457') {
+    fullName = 'Md Zeeshan Khan';
+  } else if (handle === 'khwajaconstruction477') {
+    fullName = 'KHWAJA CONSTRUCTION';
+  } else if (handle === 'rehanak9674') {
+    fullName = 'Rehana Khatoon';
+  } else if (handle === 'zeeshanmd8790') {
+    fullName = 'Zeeshan Khan';
+  } else {
+    fullName = handle
+      .replace(/[\._]/g, ' ')
+      .replace(/[0-9]/g, '')
+      .trim()
+      .replace(/\b\w/g, c => c.toUpperCase()) || 'Candidate';
+  }
+
+  return {
+    fullName,
+    email,
+    professionalTitle: 'Software Engineering Professional',
+    tagline: 'Full Stack Engineer | AI & Cloud Development',
+    linkedIn: `https://linkedin.com/in/${cleanHandle}`,
+    github: `https://github.com/${cleanHandle}`,
+    portfolio: `https://${cleanHandle}.dev`
+  };
+}
+
 export default function Profile({ onBack }) {
-  const { currentUser, linkPassword } = useAuth();
+  const { currentUser, linkPassword, updateProfileInfo } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingObj, setIsUploadingObj] = useState(false);
@@ -77,22 +139,24 @@ export default function Profile({ onBack }) {
   const [securityMessage, setSecurityMessage] = useState(null);
   const fileInputRef = useRef(null);
 
+  const initialDefaults = extractProfileDetailsFromEmail(currentUser);
+
   const [formData, setFormData] = useState({
-    fullName: currentUser?.displayName || '',
-    professionalTitle: '',
+    fullName: initialDefaults.fullName,
+    professionalTitle: initialDefaults.professionalTitle,
     targetRoleLevel: 'Mid-Senior',
-    tagline: '',
+    tagline: initialDefaults.tagline,
     bio: '',
-    email: currentUser?.email || '',
+    email: initialDefaults.email,
     phone: '',
     location: '',
-    linkedIn: '',
-    github: '',
-    portfolio: '',
+    linkedIn: initialDefaults.linkedIn,
+    github: initialDefaults.github,
+    portfolio: initialDefaults.portfolio,
     twitter: '',
     devBlog: '',
-    availability: '',
-    workStatus: '',
+    availability: 'Immediately Available',
+    workStatus: 'Actively Applying',
     careerObjective: '',
     showObjective: false,
     
@@ -130,13 +194,28 @@ export default function Profile({ onBack }) {
 
   useEffect(() => {
     const fetchProfile = async () => {
+      setIsLoading(true);
       try {
         if (currentUser) {
+          const autoDetails = extractProfileDetailsFromEmail(currentUser);
           const data = await getUserProfile(currentUser.uid);
+
           if (data) {
-            setFormData(prev => ({
-              ...prev,
+            setFormData({
+              ...autoDetails,
               ...data,
+              fullName: data.fullName !== undefined ? data.fullName : autoDetails.fullName,
+              email: currentUser.email || data.email || autoDetails.email,
+              professionalTitle: data.professionalTitle !== undefined ? data.professionalTitle : autoDetails.professionalTitle,
+              tagline: data.tagline !== undefined ? data.tagline : autoDetails.tagline,
+              linkedIn: data.linkedIn !== undefined ? data.linkedIn : autoDetails.linkedIn,
+              github: data.github !== undefined ? data.github : autoDetails.github,
+              portfolio: data.portfolio !== undefined ? data.portfolio : autoDetails.portfolio,
+              phone: data.phone !== undefined ? data.phone : '',
+              bio: data.bio !== undefined ? data.bio : '',
+              location: data.location !== undefined ? data.location : '',
+              twitter: data.twitter !== undefined ? data.twitter : '',
+              devBlog: data.devBlog !== undefined ? data.devBlog : '',
               workExperience: data.workExperience || [],
               projects: data.projects || [],
               educationList: data.educationList || [],
@@ -147,8 +226,50 @@ export default function Profile({ onBack }) {
               publications: data.publications || [],
               volunteering: data.volunteering || [],
               hackathons: data.hackathons || [],
-              cvCustomization: data.cvCustomization || prev.cvCustomization
-            }));
+              cvCustomization: data.cvCustomization || { template: 'jakes', colorTheme: 'blue', fontStyle: 'Inter', showSidebar: true }
+            });
+          } else {
+            setFormData({
+              fullName: autoDetails.fullName,
+              professionalTitle: autoDetails.professionalTitle,
+              targetRoleLevel: 'Mid-Senior',
+              tagline: autoDetails.tagline,
+              bio: '',
+              email: autoDetails.email,
+              phone: '',
+              location: '',
+              linkedIn: autoDetails.linkedIn,
+              github: autoDetails.github,
+              portfolio: autoDetails.portfolio,
+              twitter: '',
+              devBlog: '',
+              availability: 'Immediately Available',
+              workStatus: 'Actively Applying',
+              careerObjective: '',
+              showObjective: false,
+              workExperience: [],
+              projects: [],
+              educationList: [],
+              schoolingList: [],
+              languagesList: [],
+              achievements: [],
+              certifications: [],
+              publications: [],
+              volunteering: [],
+              hackathons: [],
+              technicalSkills: '',
+              frameworks: '',
+              databases: '',
+              softSkills: '',
+              tools: '',
+              languages: '',
+              interests: '',
+              education: '',
+              atsKeywords: '',
+              skills: '',
+              workHistory: '',
+              cvCustomization: { template: 'jakes', colorTheme: 'blue', fontStyle: 'Inter', showSidebar: true }
+            });
           }
         }
       } catch (error) {
@@ -158,7 +279,7 @@ export default function Profile({ onBack }) {
       }
     };
     fetchProfile();
-  }, [currentUser]);
+  }, [currentUser?.uid]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -288,7 +409,9 @@ export default function Profile({ onBack }) {
     try {
       await updateUserProfile(currentUser?.uid || 'guest', formData);
       if (formData.fullName && currentUser && currentUser.displayName !== formData.fullName) {
-        updateProfile(currentUser, { displayName: formData.fullName }).catch(() => {});
+        if (typeof updateProfileInfo === 'function') {
+          updateProfileInfo({ displayName: formData.fullName });
+        }
       }
       setMessage({ type: 'success', text: 'Profile & complete CV settings saved successfully!' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -734,7 +857,7 @@ export default function Profile({ onBack }) {
                         <AutocompleteInput
                           value={proj.tech}
                           onChange={(val) => handleArrayChange('projects', idx, 'tech', val)}
-                          placeholder="React, Node.js, Firebase, AWS"
+                          placeholder="React, Node.js, PostgreSQL, AWS"
                           suggestions={SUGGESTION_DICTIONARY.technicalSkills}
                         />
                       </div>
@@ -806,7 +929,7 @@ export default function Profile({ onBack }) {
                     value={formData.tools}
                     onChange={(val) => handleFieldUpdate('tools', val)}
                     rows={2}
-                    placeholder="Firebase, AWS, Git, Figma, Docker, Kubernetes, Prometheus"
+                    placeholder="PostgreSQL, AWS, Git, Figma, Docker, Kubernetes, Prometheus"
                     suggestions={SUGGESTION_DICTIONARY.tools}
                   />
                 </div>
@@ -817,8 +940,24 @@ export default function Profile({ onBack }) {
                     value={formData.softSkills}
                     onChange={(val) => handleFieldUpdate('softSkills', val)}
                     rows={2}
-                    placeholder="Problem Solving, Cross-Functional Collaboration, Agile/Scrum, Leadership"
+                    placeholder="Problem Solving, System Architecture, Code Review, Team Leadership"
                     suggestions={SUGGESTION_DICTIONARY.softSkills}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-card">
+              <div className="card-header"><h4>Target Role & Keywords Optimization</h4></div>
+              <div className="card-body">
+                <div className="input-with-icon textarea-icon-wrapper">
+                  <label className="floating-label">Custom Target ATS Keywords Bank (boosts ATS score)</label>
+                  <Sparkles size={18} className="input-icon align-top" style={{ color: '#6366f1' }} />
+                  <AutocompleteTextarea
+                    value={formData.atsKeywords}
+                    onChange={(val) => handleFieldUpdate('atsKeywords', val)}
+                    rows={2}
+                    placeholder="Full Stack Developer | Software Developer | Web Development | React | Node.js | Python | SQL | PostgreSQL | AWS | OpenAI API..."
                   />
                 </div>
               </div>
@@ -1238,7 +1377,7 @@ export default function Profile({ onBack }) {
                     value={formData.atsKeywords}
                     onChange={(val) => handleFieldUpdate('atsKeywords', val)}
                     rows={2}
-                    placeholder="Full Stack Developer | Software Developer | Web Development | React | Node.js | Python | SQL | Firebase | AWS | OpenAI API..."
+                    placeholder="Full Stack Developer | Software Developer | Web Development | React | Node.js | Python | SQL | PostgreSQL | AWS | OpenAI API..."
                     suggestions={SUGGESTION_DICTIONARY.technicalSkills}
                   />
                 </div>

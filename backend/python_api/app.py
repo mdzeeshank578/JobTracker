@@ -98,7 +98,7 @@ def _infer_job_type(job: Dict[str, Any], description: str = "") -> str:
 def _extract_skills(text: str) -> List[str]:
     known = [
         "Python", "JavaScript", "TypeScript", "React", "Node.js", "Flask",
-        "FastAPI", "Django", "SQL", "PostgreSQL", "Firebase", "AWS",
+        "FastAPI", "Django", "SQL", "PostgreSQL", "Express", "AWS",
         "Azure", "GCP", "Docker", "Kubernetes", "Git", "REST", "GraphQL",
         "Machine Learning", "NLP", "Java", "C++", "HTML", "CSS", "Tailwind",
     ]

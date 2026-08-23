@@ -15,8 +15,8 @@ export const supabaseService = {
       const data = await response.json();
       return data.connectedAccounts || [];
     } catch (error) {
-      console.warn('Backend server not connected. Falling back to mock data.', error.message);
-      // Retrieve mock accounts from localStorage if backend is down
+      console.warn('Backend server not connected. Falling back to local storage cache.', error.message);
+      // Retrieve accounts from localStorage if backend is down
       const cached = localStorage.getItem(`jobtracker_connected_accounts_${userId}`);
       return cached ? JSON.parse(cached) : [];
     }

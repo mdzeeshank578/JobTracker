@@ -553,16 +553,16 @@ Return strictly a JSON object:
     ...resumeData,
     summary: `Results-driven Full Stack Engineer with expertise in building scalable web applications and cloud architectures. Skilled in React, Node.js, Python, SQL, AWS, and OpenAI API with a focus on P99 latency optimization, clean architecture, and cross-functional Agile leadership.`,
     workHistory: `• Engineered responsive full-stack features using React and Node.js, reducing API response latency by 25%.
-• Integrated Firebase Authentication and Firestore rules, securing data access for 1,000+ active users.
+• Integrated PostgreSQL database authentication and REST API security, securing data access for 1,000+ active users.
 • Built and maintained CI/CD deployment pipelines on AWS, improving release cycle speeds by 30%.
 • Collaborated in an Agile/Scrum team of 6 engineers to ship high-performing SaaS application features.`,
-    technicalSkills: ['JavaScript (ES6+)', 'Python', 'SQL', 'React.js', 'Node.js', 'Express.js', 'TailwindCSS', 'Firebase', 'AWS', 'OpenAI API'],
+    technicalSkills: ['JavaScript (ES6+)', 'Python', 'SQL', 'React.js', 'Node.js', 'Express.js', 'TailwindCSS', 'PostgreSQL', 'AWS', 'OpenAI API'],
     softSkills: ['Agile / Scrum', 'CI/CD Automation', 'System Design', 'Cross-Functional Collaboration'],
     projects: [
       {
         name: 'Enterprise Job Tracker SaaS',
-        tech: 'React, Node.js, Firebase',
-        description: 'Architected full-stack job application tracker with real-time status updates and automated cloud sync.\nIntegrated Firebase Auth and Firestore for encrypted user data storage and sub-50ms data retrieval.'
+        tech: 'React, Node.js, PostgreSQL',
+        description: 'Architected full-stack job application tracker with real-time status updates and automated cloud sync.\nIntegrated JWT Auth and PostgreSQL for encrypted user data storage and sub-50ms data retrieval.'
       },
       {
         name: 'AI Candidate Matching Engine',
@@ -1356,7 +1356,7 @@ Key Responsibilities:
 
 Qualifications & Requirements:
 • 2+ years of professional experience in modern software engineering (${safeRole} domain).
-• Technical Proficiency: JavaScript/TypeScript, React/Next.js, Node.js/Python, SQL/NoSQL databases, and Cloud services (AWS/GCP/Firebase).
+• Technical Proficiency: JavaScript/TypeScript, React/Next.js, Node.js/Python, SQL/NoSQL databases, and Cloud services (AWS/GCP/PostgreSQL).
 • Strong problem-solving aptitude, understanding of algorithms, state management, and system architecture principles.
 • Excellent communication skills, growth mindset, and passion for continuous innovation.`;
 }
