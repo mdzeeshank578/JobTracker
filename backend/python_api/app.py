@@ -18,7 +18,12 @@ if env_file.exists():
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": os.getenv("FRONTEND_ORIGIN", "*")}})
+frontend_origins_raw = os.getenv("FRONTEND_ORIGIN", "*")
+frontend_origins = [o.strip() for o in frontend_origins_raw.split(",") if o.strip()]
+if not frontend_origins or "*" in frontend_origins:
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+else:
+    CORS(app, resources={r"/api/*": {"origins": frontend_origins}}, supports_credentials=True)
 
 ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 JOOBLE_BASE_URL = "https://jooble.org/api"

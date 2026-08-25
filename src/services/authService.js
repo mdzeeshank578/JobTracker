@@ -1,4 +1,6 @@
-const BACKEND_URL = 'http://localhost:5001/api/auth';
+const BACKEND_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL)
+  ? `${import.meta.env.VITE_API_BASE_URL}/auth`
+  : 'http://localhost:5001/api/auth';
 
 export async function registerAccount(email, password, displayName) {
   try {

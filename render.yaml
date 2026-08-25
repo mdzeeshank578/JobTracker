@@ -1,0 +1,36 @@
+services:
+  # 1. Express REST Backend & Sync API
+  - type: web
+    name: jobtracker-express-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5001
+      - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
+  # 2. Python AI & Job Search Service
+  - type: web
+    name: jobtracker-python-ai
+    env: python
+    rootDir: backend/python_api
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false

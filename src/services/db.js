@@ -1,8 +1,20 @@
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL)
+  || 'http://localhost:5001/api';
 
-export function clearUserSession(userId) {
+export function resolveUserId(userIdInput) {
+  if (!userIdInput) return 'guest';
+  if (typeof userIdInput === 'object') {
+    return userIdInput.id || userIdInput.uid || userIdInput.userId || 'guest';
+  }
+  const str = String(userIdInput).trim();
+  return (str && str !== 'undefined' && str !== 'null') ? str : 'guest';
+}
+
+export function clearUserSession(userIdInput) {
+  const userId = resolveUserId(userIdInput);
   try {
     localStorage.removeItem('jobtracker_token');
+    localStorage.removeItem('jobtracker_token_owner');
     if (userId) {
       localStorage.removeItem(`jobtracker_token_${userId}`);
       localStorage.removeItem(`jobtracker_user_profile_${userId}`);
@@ -10,8 +22,18 @@ export function clearUserSession(userId) {
   } catch (e) {}
 }
 
-function getAuthHeaders(userId) {
-  const token = localStorage.getItem('jobtracker_token') || (userId ? localStorage.getItem(`jobtracker_token_${userId}`) : null);
+function getAuthHeaders(userIdInput) {
+  const safeUserId = resolveUserId(userIdInput);
+  const userToken = safeUserId !== 'guest' ? localStorage.getItem(`jobtracker_token_${safeUserId}`) : null;
+  const globalToken = localStorage.getItem('jobtracker_token');
+  const tokenOwner = localStorage.getItem('jobtracker_token_owner');
+  
+  // Strictly enforce that globalToken is only sent if it belongs to safeUserId
+  let token = userToken;
+  if (!token && globalToken && tokenOwner === safeUserId) {
+    token = globalToken;
+  }
+  
   const headers = {
     'Content-Type': 'application/json'
   };
@@ -22,8 +44,8 @@ function getAuthHeaders(userId) {
 }
 
 // Helper to load jobs from local storage per-user
-function getLocalJobs(userId) {
-  const safeUserId = userId || 'guest';
+function getLocalJobs(userIdInput) {
+  const safeUserId = resolveUserId(userIdInput);
   const storageKey = `jobtracker_user_jobs_${safeUserId}`;
   try {
     const userCached = localStorage.getItem(storageKey);
@@ -34,8 +56,8 @@ function getLocalJobs(userId) {
 }
 
 // Helper to save jobs to local storage per-user
-function saveLocalJobs(userId, jobs) {
-  const safeUserId = userId || 'guest';
+function saveLocalJobs(userIdInput, jobs) {
+  const safeUserId = resolveUserId(userIdInput);
   const storageKey = `jobtracker_user_jobs_${safeUserId}`;
   try {
     localStorage.setItem(storageKey, JSON.stringify(jobs));
@@ -53,8 +75,8 @@ function normalizeJobStatus(statusInput) {
   return 'Applied';
 }
 
-export function subscribeToJobs(userId, callback) {
-  const safeUserId = userId || 'guest';
+export function subscribeToJobs(userIdInput, callback) {
+  const safeUserId = resolveUserId(userIdInput);
   
   // 1. Immediately return local cached jobs (0ms delay)
   const initialLocal = getLocalJobs(safeUserId);
@@ -80,10 +102,16 @@ export function subscribeToJobs(userId, callback) {
           createdAt: j.createdAt || j.created_at || new Date().toISOString()
         }));
 
+        // Strict isolation filter: filter out any remote job not owned by safeUserId
+        const filteredRemote = remoteJobs.filter(j => {
+          const owner = j.user_id || j.userId;
+          return !owner || owner === safeUserId;
+        });
+
         const localJobs = getLocalJobs(safeUserId);
         const mergedMap = new Map();
 
-        remoteJobs.forEach(j => {
+        filteredRemote.forEach(j => {
           if (j.id || j._id) mergedMap.set(j.id || j._id, j);
         });
 
@@ -113,8 +141,8 @@ export function subscribeToJobs(userId, callback) {
   };
 }
 
-export async function addJob(userId, jobData) {
-  const safeUserId = userId || 'guest';
+export async function addJob(userIdInput, jobData) {
+  const safeUserId = resolveUserId(userIdInput);
   const normStatus = normalizeJobStatus(jobData.status);
   const tempId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
@@ -172,8 +200,8 @@ export async function addJob(userId, jobData) {
   return newJob;
 }
 
-export async function updateJob(userId, jobId, updates) {
-  const safeUserId = userId || 'guest';
+export async function updateJob(userIdInput, jobId, updates) {
+  const safeUserId = resolveUserId(userIdInput);
   const targetId = typeof jobId === 'object' ? (jobId?._id || jobId?.id) : jobId;
   const existing = getLocalJobs(safeUserId);
   const updatedJobs = existing.map(j => {
@@ -200,8 +228,8 @@ export async function updateJob(userId, jobId, updates) {
   }
 }
 
-export async function deleteJob(userId, jobId) {
-  const safeUserId = userId || 'guest';
+export async function deleteJob(userIdInput, jobId) {
+  const safeUserId = resolveUserId(userIdInput);
   const targetId = typeof jobId === 'object' ? (jobId?._id || jobId?.id) : jobId;
   if (!targetId) return;
 
@@ -219,8 +247,8 @@ export async function deleteJob(userId, jobId) {
   }
 }
 
-export async function getUserProfile(userId) {
-  const safeUserId = userId || 'guest';
+export async function getUserProfile(userIdInput) {
+  const safeUserId = resolveUserId(userIdInput);
   const storageKey = `jobtracker_user_profile_${safeUserId}`;
   try {
     const res = await fetch(`${API_BASE_URL}/profile`, {
@@ -241,8 +269,8 @@ export async function getUserProfile(userId) {
   return cached ? JSON.parse(cached) : null;
 }
 
-export async function updateUserProfile(userId, profileData) {
-  const safeUserId = userId || 'guest';
+export async function updateUserProfile(userIdInput, profileData) {
+  const safeUserId = resolveUserId(userIdInput);
   const storageKey = `jobtracker_user_profile_${safeUserId}`;
 
   // Strip client-side userId payload before sending
@@ -272,11 +300,11 @@ export async function updateUserProfile(userId, profileData) {
   return { userId: safeUserId, ...profileData };
 }
 
-export async function saveJobForLater(userId, jobData) {
-  return await addJob(userId, { ...jobData, status: 'WISHLIST' });
+export async function saveJobForLater(userIdInput, jobData) {
+  return await addJob(userIdInput, { ...jobData, status: 'WISHLIST' });
 }
 
-export async function uploadDocument(userId, file) {
+export async function uploadDocument(userIdInput, file) {
   if (!file) return null;
   return new Promise((resolve) => {
     const reader = new FileReader();

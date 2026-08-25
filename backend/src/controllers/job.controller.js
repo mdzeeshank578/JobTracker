@@ -41,6 +41,17 @@ export const jobController = {
       const userId = req.user.id; // ALWAYS use req.user.id
       const payload = { ...req.body };
 
+      const company = (payload.company || payload.companyName || '').toString().trim();
+      const role = (payload.role || payload.jobTitle || '').toString().trim();
+
+      if (!company || !role) {
+        return res.status(400).json({
+          success: false,
+          statusCode: 400,
+          message: 'Company name and job role/title are required.'
+        });
+      }
+
       // Strictly strip any incoming userId in body
       delete payload.userId;
       delete payload.user_id;

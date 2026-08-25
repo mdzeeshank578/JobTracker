@@ -78,11 +78,12 @@ function readFallbackDb() {
   }
 }
 
-// Write fallback DB
 function writeFallbackDb(data) {
   initializeFallbackDb();
   try {
-    fs.writeFileSync(FALLBACK_DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+    const tempPath = `${FALLBACK_DB_PATH}.${Date.now()}.${Math.random().toString(36).substring(2, 7)}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tempPath, FALLBACK_DB_PATH);
   } catch (e) {
     console.error('Failed to write to fallback database:', e);
   }

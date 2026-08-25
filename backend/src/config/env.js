@@ -7,6 +7,13 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 
+const isProduction = process.env.NODE_ENV === 'production';
+const jwtSecret = process.env.JWT_SECRET || (isProduction ? '' : 'jobtracker_enterprise_secret_key_2026');
+
+if (isProduction && (!jwtSecret || jwtSecret === 'jobtracker_enterprise_secret_key_2026')) {
+  console.error('[SECURITY FATAL] Production deployment detected without a secure JWT_SECRET environment variable set!');
+}
+
 export const env = {
   PORT: process.env.PORT || 5001,
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -17,5 +24,5 @@ export const env = {
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
-  JWT_SECRET: process.env.JWT_SECRET || 'jobtracker_enterprise_secret_key_2026'
+  JWT_SECRET: jwtSecret || 'jobtracker_enterprise_secret_key_2026'
 };

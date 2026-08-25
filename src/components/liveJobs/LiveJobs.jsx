@@ -157,11 +157,11 @@ export default function LiveJobs({ trackedJobs = [], onStartPractice }) {
   };
 
   const handleConfirmApply = async (job, applicationData) => {
-    await addJob(currentUser.uid, toTrackerJob(job, 'Applied', applicationData));
+    await addJob(currentUser, toTrackerJob(job, 'Applied', applicationData));
   };
 
   const handleSave = async (job) => {
-    await saveJobForLater(currentUser.uid, {
+    await saveJobForLater(currentUser, {
       ...toTrackerJob(job, 'Saved'),
       savedAt: new Date().toISOString(),
       liveJobId: job.id,

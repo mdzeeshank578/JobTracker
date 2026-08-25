@@ -55,10 +55,18 @@ export function AuthProvider({ children }) {
 
   async function handleAuthSuccess(userObj, token) {
     const normalized = normalizeUserObj(userObj);
+    const userId = normalized?.id;
     if (token) {
       localStorage.setItem('jobtracker_token', token);
-      if (normalized?.id) {
-        localStorage.setItem(`jobtracker_token_${normalized.id}`, token);
+      if (userId) {
+        localStorage.setItem('jobtracker_token_owner', userId);
+        localStorage.setItem(`jobtracker_token_${userId}`, token);
+      }
+    } else {
+      localStorage.removeItem('jobtracker_token');
+      localStorage.removeItem('jobtracker_token_owner');
+      if (userId) {
+        localStorage.removeItem(`jobtracker_token_${userId}`);
       }
     }
     setCurrentUser(normalized);
@@ -138,10 +146,14 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
-    const prevUserId = currentUser?.uid || currentUser?.id || currentUser?.userId;
+    const prevUserId = currentUser?.id || currentUser?.uid || currentUser?.userId;
     setCurrentUser(null);
     saveStoredUser(null);
     localStorage.removeItem('jobtracker_token');
+    localStorage.removeItem('jobtracker_token_owner');
+    if (prevUserId) {
+      localStorage.removeItem(`jobtracker_token_${prevUserId}`);
+    }
     clearUserSession(prevUserId);
   }
 

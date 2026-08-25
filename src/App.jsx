@@ -15,7 +15,7 @@ import ChatAssistant from './components/dashboard/ChatAssistant';
 import SyncCenter from './components/dashboard/SyncCenter';
 import LiveJobs from './components/liveJobs/LiveJobs';
 import FourRoundPracticeModal from './components/interview/FourRoundPracticeModal';
-import { subscribeToJobs, addJob, updateJob, deleteJob, uploadDocument } from './services/db';
+import { subscribeToJobs, addJob, updateJob, deleteJob, uploadDocument, resolveUserId } from './services/db';
 
 function ProtectedRoute({ children }) {
   const { currentUser } = useAuth();
@@ -25,9 +25,11 @@ function ProtectedRoute({ children }) {
 
 function MainApp() {
   const { currentUser } = useAuth();
+  const activeUserId = resolveUserId(currentUser);
+
   const [jobs, setJobs] = useState(() => {
     try {
-      const userKey = currentUser?.uid ? `jobtracker_user_jobs_${currentUser.uid}` : 'jobtracker_user_jobs_guest';
+      const userKey = `jobtracker_user_jobs_${activeUserId}`;
       const userCached = localStorage.getItem(userKey);
       return userCached ? JSON.parse(userCached) : [];
     } catch (e) {
@@ -44,16 +46,19 @@ function MainApp() {
   const [editingJob, setEditingJob] = useState(null);
 
   useEffect(() => {
-    const userId = currentUser?.uid || 'guest';
-    const userKey = `jobtracker_user_jobs_${userId}`;
+    if (!currentUser) {
+      setJobs([]);
+      return;
+    }
+    const userKey = `jobtracker_user_jobs_${activeUserId}`;
     const userCached = localStorage.getItem(userKey);
     setJobs(userCached ? JSON.parse(userCached) : []);
 
-    const unsubscribe = subscribeToJobs(userId, (data) => {
+    const unsubscribe = subscribeToJobs(activeUserId, (data) => {
       setJobs(data);
     });
     return () => unsubscribe();
-  }, [currentUser?.uid]);
+  }, [currentUser, activeUserId]);
 
   // Global listener for 4-Round Practice Session requests
   useEffect(() => {
@@ -141,10 +146,10 @@ function MainApp() {
 
       if (editingJob && (editingJob.id || editingJob._id)) {
         savedJobId = editingJob.id || editingJob._id;
-        await updateJob(currentUser.uid, savedJobId, finalJobData);
+        await updateJob(activeUserId, savedJobId, finalJobData);
         setJobs(prev => prev.map(j => (j.id === savedJobId || j._id === savedJobId) ? { ...j, ...finalJobData } : j));
       } else {
-        savedJob = await addJob(currentUser.uid, finalJobData);
+        savedJob = await addJob(activeUserId, finalJobData);
         savedJobId = savedJob?.id || savedJob?._id;
         if (savedJob) {
           setJobs(prev => [savedJob, ...prev.filter(j => j.id !== savedJobId && j._id !== savedJobId)]);
@@ -188,7 +193,7 @@ function MainApp() {
           if (newCoverLetterUrl !== null) updates.coverLetterUrl = newCoverLetterUrl;
           
           if (Object.keys(updates).length > 0) {
-            await updateJob(currentUser.uid, savedJobId, updates);
+            await updateJob(activeUserId, savedJobId, updates);
             setJobs(prev => prev.map(j => (j.id === savedJobId || j._id === savedJobId) ? { ...j, ...updates } : j));
           }
         } catch (fileError) {
@@ -210,9 +215,8 @@ function MainApp() {
 
     if (window.confirm("Are you sure you want to delete this application?")) {
       try {
-        const userId = currentUser?.uid || 'guest';
         setJobs(prev => prev.filter(j => j.id !== targetId && j._id !== targetId));
-        await deleteJob(userId, targetId);
+        await deleteJob(activeUserId, targetId);
       } catch (error) {
         console.error("Error deleting job:", error);
         alert("Failed to delete application");
